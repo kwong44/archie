@@ -1,0 +1,211 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Project Rules: Technology Stack & Architecture
+
+---
+
+## 1. Overview
+
+This document defines the official technology stack and architectural rules for the "Archie" mobile application. The project is a cross-platform mobile app built with React Native (via Expo) and a Supabase backend, with a specialized Python microservice for handling complex AI operations. Adherence to these rules is mandatory for all development to ensure consistency, scalability, and maintainability.
+
+---
+
+## 2. Core Architectural Principles
+
+*   **BaaS First:** All standard backend operations (database CRUD, authentication, file storage) **MUST** be handled by the Supabase client directly from the frontend. This simplifies the architecture and leverages Supabase's robust, real-time capabilities.
+*   **Isolate AI Logic:** The custom Python backend serves **ONLY** as a secure gateway to external AI APIs. It **MUST NOT** contain any business logic related to CRUD operations or user management. This keeps the service lightweight, secure, and focused.
+*   **TypeScript Everywhere:** The entire frontend codebase **MUST** be written in TypeScript to ensure type safety, improve code quality, and enhance developer experience.
+*   **Environment Variables:** All sensitive keys (Supabase public/anon key, AI backend URL, etc.) **MUST** be managed through environment variables (`.env` files) and exposed via `expo-constants`. **DO NOT** hardcode keys in the source code.
+
+---
+
+## 3. Frontend
+
+*   **Framework:** React Native
+*   **Platform / Toolkit:** Expo (Managed Workflow)
+    *   **Rule:** Utilize the latest Expo SDK. All native functionality should be sourced from the Expo SDK or officially compatible libraries first before considering custom native modules.
+*   **Language:** TypeScript
+*   **State Management:** Zustand
+    *   **Rationale:** Chosen for its simplicity, minimal boilerplate, and hook-based API that fits well with React's functional paradigm.
+    *   **Rule:** Create separate, atomic stores for different domains of state (e.g., `useAuthStore`, `useJournalStore`). Avoid creating a single monolithic store.
+*   **Styling:** `react-native-unistyles`
+    *   **Rationale:** Provides type-safe, responsive styles with a simple API that supports themes and media queries out of the box.
+    *   **Rule:** Define all stylesheets in colocated `styles.ts` files to keep component-related code organized and maintainable.
+*   **Navigation:** Expo Router (File-Based)
+    *   **Rationale:** As the official routing solution for Expo, it offers a simple, convention-over-configuration approach to defining navigation structures.
+
+---
+
+## 4. Backend as a Service (BaaS)
+
+*   **Provider:** Supabase
+*   **Client Library:** `@supabase/supabase-js`
+*   **Features Used:**
+    *   **Database:** PostgreSQL (Primary data store).
+    *   **Authentication:** Handles all user identity (email/password, social logins via Google/Apple).
+    *   **Storage:** For user-uploaded content (e.g., audio mantras).
+*   **Rule:** The Supabase client **MUST** be initialized once in a central file (`lib/supabase.ts`) and imported throughout the app. This singleton pattern ensures consistent configuration and state.
+
+#### Example: Supabase Client Initialization (`lib/supabase.ts`)
+```typescript
+import 'react-native-url-polyfill/auto'
+import { createClient } from '@supabase/supabase-js'
+import * as SecureStore from 'expo-secure-store'
+import Constants from 'expo-constants'
+
+const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl
+const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey
+
+// Custom secure storage adapter for Expo
+const ExpoSecureStoreAdapter = {
+  getItem: (key: string) => {
+    return SecureStore.getItemAsync(key)
+  },
+  setItem: (key: string, value: string) => {
+    SecureStore.setItemAsync(key, value)
+  },
+  removeItem: (key: string) => {
+    SecureStore.deleteItemAsync(key)
+  },
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: ExpoSecureStoreAdapter,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+  },
+})
+```
+
+---
+
+## 5. Specialized AI Backend
+
+*   **Role:** Securely proxying requests to third-party AI APIs.
+*   **Language:** Python 3.11+
+*   **Framework:** FastAPI
+*   **Hosting:** Google Cloud Run (deployed as a Docker container).
+*   **Rule:** All routes **MUST** validate the user's Supabase JWT to ensure only authenticated users can access the AI functionalities. The backend should be stateless, with all state managed by the client or Supabase.
+
+#### Example: Secure FastAPI Route (`main.py`)
+```python
+from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import httpx
+import os
+
+# Assume a function `verify_jwt` exists to validate the Supabase token
+from .auth import verify_jwt 
+
+app = FastAPI()
+
+GOOGLE_AI_API_KEY = os.getenv("GOOGLE_AI_API_KEY")
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+
+@app.post("/api/summarize")
+async def summarize_text(request: Request, token: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
+    # 1. Verify user's JWT
+    payload = verify_jwt(token.credentials)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    # 2. Get text from request and call Google AI
+    data = await request.json()
+    text_to_summarize = data.get("text")
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            f"{GEMINI_API_URL}?key={GOOGLE_AI_API_KEY}",
+            json={
+                "contents": [{"parts":[{"text": f"Summarize this journal entry in an empathetic and encouraging tone: {text_to_summarize}"}]}]
+            }
+        )
+    
+    # 3. Return the result
+    return response.json()
+```
+
+---
+
+## 6. Backend Logging
+
+To ensure observability and effective debugging, the AI backend **MUST** use structured logging. While Winston is a standard for Node.js, the Python equivalent is to use the built-in `logging` module configured with a `JSONFormatter`.
+
+*   **Library:** Python `logging` module.
+*   **Format:** All logs should be emitted as a single-line JSON object.
+*   **Rule:** Create a central logging utility to configure and provide a logger instance to the rest of the application. This ensures all logs are consistent in structure.
+
+#### Example: Structured Logger Configuration (`logger.py`)
+
+```python
+import logging
+import json
+from pythonjsonlogger import jsonlogger
+
+# 1. Get the logger instance
+logger = logging.getLogger("archie-ai-backend")
+logger.setLevel(logging.INFO)
+
+# 2. Create a handler to output to console
+logHandler = logging.StreamHandler()
+
+# 3. Create a JSON formatter and add it to the handler
+# Standard fields added to all log messages
+formatter = jsonlogger.JsonFormatter(
+    '%(asctime)s %(name)s %(levelname)s %(message)s'
+)
+logHandler.setFormatter(formatter)
+
+# 4. Add the handler to the logger
+# Avoid adding handlers multiple times in a serverless environment
+if not logger.handlers:
+    logger.addHandler(logHandler)
+
+```
+
+#### Example: Using the Logger in a FastAPI route
+
+```python
+# In main.py or another route file
+from .logger import logger
+
+@app.post("/api/generate")
+async def generate(request: Request, token: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
+    user_payload = verify_jwt(token.credentials)
+    user_id = user_payload.get("sub")
+
+    logger.info(
+        "Generate endpoint called by user", 
+        extra={'user_id': user_id, 'request_id': request.headers.get('x-request-id')}
+    )
+
+    try:
+        # ... your business logic ...
+        logger.info("Successfully generated content for user", extra={'user_id': user_id})
+        return {"status": "success"}
+    except Exception as e:
+        logger.error(
+            "An error occurred in the generate endpoint",
+            extra={'user_id': user_id, 'error': str(e)},
+            exc_info=True # Adds stack trace
+        )
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+```
+
+---
+
+## 7. Third-Party Services & DevOps
+
+*   **AI Services:**
+    *   Google Cloud Speech-to-Text
+    *   Google Cloud Natural Language
+    *   Google Gemini API
+*   **Payments:** RevenueCat (for managing in-app subscriptions).
+*   **Push Notifications:** Firebase Cloud Messaging (FCM) (via Expo's `expo-notifications` library).
+*   **CI/CD:** GitHub Actions (for automating tests, linting, and deployments).

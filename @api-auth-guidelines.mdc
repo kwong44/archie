@@ -1,0 +1,230 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Project Rules: Backend Interaction & API Guidelines
+
+---
+
+## 1. Goal
+
+This document outlines the **mandatory** rules and procedures for interacting with backend services (Supabase and the specialized AI backend) from the "The Architect" mobile application. The primary goals are to ensure **security**, **consistency**, and **maintainability** by standardizing how authentication, data validation, and backend requests are handled. Adherence to these guidelines is critical for preventing security vulnerabilities and ensuring predictable app behavior.
+
+**All new backend interactions MUST follow these guidelines without exception.**
+
+---
+
+## 2. Core Principles
+
+*   **Security First:** Authentication and data integrity are non-negotiable. All backend interactions must be properly secured. This is primarily achieved through Supabase's built-in features (Auth, RLS) and JWT validation in the AI backend.
+*   **Consistency:** Use the established clients and patterns for all backend communication. This makes the codebase easier to read, debug, and maintain.
+*   **Leverage Utilities:** Utilize the centrally configured `supabase` client (`lib/supabase.ts`) for all BaaS operations and create a dedicated, reusable client for interacting with the AI backend. Do not instantiate clients on-the-fly in components.
+*   **Clear Separation:** Keep data-fetching and business logic separate from UI components. Use custom hooks or service files to encapsulate interactions with Supabase and the AI backend.
+
+---
+
+## 3. Part 1: Interacting with Supabase (BaaS)
+
+Supabase is our primary backend for database, authentication, and storage. All interactions MUST follow the principles of the "BaaS First" architecture.
+
+### 3.1. The Singleton Supabase Client
+
+All Supabase operations **MUST** use the single, pre-configured client instance exported from `lib/supabase.ts`. This client is configured with a secure storage adapter and handles session persistence and token refreshing automatically.
+
+**DO NOT create new `createClient()` instances elsewhere in the application.**
+
+### 3.2. Authentication & Authorization via Row Level Security (RLS)
+
+In our architecture, authorization is not handled in middleware on a custom server. Instead, it is enforced directly in the database using **PostgreSQL's Row Level Security (RLS)**.
+
+*   **Authentication:** The Supabase client automatically includes the logged-in user's authentication token with every request.
+*   **Authorization:** RLS policies on your database tables use the user's ID (`auth.uid()`) from the token to determine which rows they are allowed to access or modify.
+
+**Rule:** Every table containing user-specific or sensitive data **MUST** have RLS enabled and have policies defined for `SELECT`, `INSERT`, `UPDATE`, and `DELETE` operations.
+
+#### Example: RLS Policy for a `journal_entries` table
+
+This policy ensures that a user can only interact with their own journal entries.
+
+```sql
+-- 1. Enable RLS on the table
+ALTER TABLE public.journal_entries ENABLE ROW LEVEL SECURITY;
+
+-- 2. Create a policy that allows users to SELECT their own entries
+CREATE POLICY "Users can view their own journal entries."
+ON public.journal_entries FOR SELECT
+USING (auth.uid() = user_id);
+
+-- 3. Create a policy that allows users to INSERT entries for themselves
+CREATE POLICY "Users can create their own journal entries."
+ON public.journal_entries FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+```
+
+### 3.3. Client-Side Data Validation
+
+To ensure data integrity, request data **MUST** be validated on the client-side **before** being sent to Supabase. We use `zod` for this purpose.
+
+#### Example: Creating a Journal Entry with Validation
+
+```typescript
+// services/journalService.ts
+import { supabase } from '@/lib/supabase';
+import { z } from 'zod';
+
+// 1. Define the validation schema for the request data.
+const journalEntrySchema = z.object({
+  content: z.string().min(10, 'Entry must be at least 10 characters long.'),
+  mood: z.enum(['happy', 'sad', 'neutral']),
+});
+
+// 2. Define the service function.
+export async function createJournalEntry(userId: string, entryData: unknown) {
+  // 3. Validate the input data.
+  const validationResult = journalEntrySchema.safeParse(entryData);
+
+  if (!validationResult.success) {
+    // Throw an error or return a result object to be handled by the UI.
+    throw new Error('Invalid journal entry data.', { cause: validationResult.error });
+  }
+
+  const validatedData = validationResult.data;
+
+  // 4. Perform the Supabase operation with validated data.
+  const { error } = await supabase
+    .from('journal_entries')
+    .insert({
+      user_id: userId,
+      content: validatedData.content,
+      mood: validatedData.mood,
+    });
+
+  if (error) {
+    // Handle potential errors from Supabase.
+    throw new Error('Failed to create journal entry.', { cause: error });
+  }
+}
+```
+
+---
+
+## 4. Part 2: Interacting with the Specialized AI Backend
+
+The Python (FastAPI) backend serves a single purpose: to act as a secure proxy to third-party AI services.
+
+### 4.1. Authentication Flow
+
+All requests to the AI backend **MUST** be authenticated using a JWT from the user's current Supabase session.
+
+1.  **Get Token:** Before making a request, retrieve the `access_token` from the active Supabase session.
+2.  **Send Token:** Include this token in the `Authorization` header of the request, prefixed with `Bearer `.
+
+### 4.2. Recommended Pattern: Dedicated AI API Client
+
+To ensure consistency, create a dedicated API client for the AI backend. This client should be configured to automatically include the `Authorization` header.
+
+#### Example: `aiApiClient` using `fetch`
+
+```typescript
+// lib/aiApiClient.ts
+import { supabase } from './supabase';
+
+const AI_BACKEND_URL = process.env.EXPO_PUBLIC_AI_BACKEND_URL; // From environment variables
+
+async function getAuthHeader() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error("No active session found. User must be logged in.");
+  }
+  return `Bearer ${session.access_token}`;
+}
+
+export const aiApiClient = {
+  post: async <T>(endpoint: string, body: unknown): Promise<T> => {
+    const response = await fetch(`${AI_BACKEND_URL}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': await getAuthHeader(),
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({})); // Gracefully handle non-JSON error responses
+      throw new Error(errorData.detail || `HTTP error! Status: ${response.status}`);
+    }
+    
+    return response.json() as Promise<T>;
+  },
+  // You can add other methods like get, put, etc. if needed.
+};
+
+```
+
+### 4.3. Code Implementation Example (Frontend)
+
+Using the `aiApiClient` to call the AI summarization endpoint.
+
+```typescript
+// services/aiService.ts
+import { aiApiClient } from '@/lib/aiApiClient';
+
+interface SummarizeResponse {
+  // Define the expected shape of the AI's response
+  summary: string;
+}
+
+export async function summarizeJournal(text: string) {
+  try {
+    const response = await aiApiClient.post<SummarizeResponse>('/api/summarize', {
+      text,
+    });
+    console.log('Summary received:', response.summary);
+    return response;
+  } catch (error) {
+    console.error('Error summarizing journal:', error.message);
+    // Show an error message to the user.
+    throw error;
+  }
+}
+```
+
+---
+
+## 5. Part 3: Advanced - Supabase Edge Functions
+
+For business logic that is too complex for RLS or should not run on the client, use **Supabase Edge Functions**.
+
+*   **Use Cases:** Third-party API integrations (e.g., sending an email), complex data mutations, or operations requiring elevated privileges.
+*   **Security:** Edge Functions can be invoked with the user's authentication context, allowing you to perform secure server-side actions on their behalf.
+*   **Implementation:** Functions are written in TypeScript and deployed via the Supabase CLI.
+
+#### Example: Invoking an Edge Function
+
+```typescript
+// Calling a function named 'process-data'
+const { data, error } = await supabase.functions.invoke('process-data', {
+  body: { somePayload: 'value' },
+});
+
+if (error) {
+  // Handle error
+}
+```
+
+---
+
+## 6. Standardized Error Responses
+
+Consistent error handling is key. Be prepared to handle errors from both Supabase and the AI backend.
+
+*   **Supabase Client Error (`PostgrestError`):**
+    *   **Structure:** `{ "message": "...", "details": "...", "hint": "...", "code": "..." }`
+    *   **Handling:** Always check for the `error` object in the response from any Supabase query.
+
+*   **AI Backend Error:**
+    *   **401 Unauthorized:** `Status: 401`, `Body: { "detail": "Invalid token" }`
+    *   **422 Unprocessable Entity (Validation Error):** `Status: 422`, `Body: { "detail": [...] }`
+    *   **500 Internal Server Error:** `Status: 500`, `Body: { "error": "An unexpected error occurred." }`

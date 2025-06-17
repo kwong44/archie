@@ -1,0 +1,75 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+PRD V1: The Architect
+1. Introduction
+Product Name: The Architect
+Vision: To empower individuals to consciously reshape their reality by transforming their language. The Architect is a digital sanctuary and AI-powered guide that helps users move from a vocabulary of limitation to a language of possibility.
+Objective: To launch a cross-platform mobile application (using Expo) that allows users to record their thoughts via voice, receive AI-powered assistance in reframing their language, track their mindset transformation, and cultivate a more self-authored life.
+2. User Personas & Stories
+Target User Summary: The target user is interested in self-improvement, mindfulness, and positive psychology. They believe in the power of words to shape their experience of life and are looking for a practical, engaging, and private tool for daily personal growth.
+Primary User Stories:
+"As a new user, I want a simple and inspiring setup process that helps me define my core beliefs."
+"As a user, I want to easily record my thoughts using just my voice."
+"As a user, I want the app to help me identify my limiting words and suggest more empowering alternatives from my personal lexicon."
+"As a user, I want to receive an encouraging summary of my thoughts that reinforces my new perspective."
+"As a user, I want a dashboard that visualizes my progress and shows my consistency to keep me motivated."
+"As a user, I want to be able to review, add, and manage my personal list of word-swaps (my Lexicon)."
+"As a user, I want to add the app to my home screen for easy access."
+3. Features & Functionality (The Core Task Breakdown)
+Here is the full project breakdown, organized into epics and tasks. (✅ = Implemented in provided files, ⏳ = To be implemented/wired up)
+
+Epic 1: Project Setup & Core Structure
+
+✅ Task 1.1: Initialize Expo project with TypeScript, Expo Router, and necessary dependencies (package.json).
+✅ Task 1.2: Configure app.json with app name, icons, splash screen, and plugins.
+✅ Task 1.3: Set up root layout (app/_layout.tsx) to handle font loading and global navigation structure.
+✅ Task 1.4: Implement tab-based navigation (app/(tabs)/_layout.tsx) for the main app sections.
+✅ Task 1.5: Set up Supabase project for authentication and database storage.
+⏳ Task 1.6: Set up the specialized Python/FastAPI backend project and configure for deployment on Google Cloud Run.
+
+Epic 2: Onboarding & The Blueprint (New Feature)
+
+✅ Task 2.1: Build the Aspirational Onboarding screen (pre-login).
+✅ Task 2.2: Implement user authentication with Supabase Auth (e.g., magic link or social logins).
+✅ Task 2.3: Build the UI for AI-Assisted Principle Definition (e.g., a multi-select list of principles).
+✅ Task 2.4: Build the interactive (swipeable card) UI for the initial Lexicon setup.
+✅ Task 2.5: Implement the logic to save the user's chosen Principles and Lexicon words to the Supabase database.
+
+Epic 3: The Core Loop - Workshop & Reframing
+
+✅ Task 3.1: Implement the "Workshop" home screen UI (app/(tabs)/index.tsx), including the pulsing orb animation.
+✅ Task 3.2: Implement voice recording functionality using expo-av.
+✅ Task 3.3: Implement the "Reframe" screen UI (app/reframe.tsx) with areas for the transcript and AI summary.
+⏳ Task 3.4: Integrate the specialized AI backend for Speech-to-Text transcription. The frontend will send the audio file from expo-av and receive the transcript.
+⏳ Task 3.5: Connect the interactive reframing logic on the Reframe screen to the user's actual Lexicon data from Supabase.
+⏳ Task 3.6: Integrate the AI backend for generating the "Guide's Reflection." The frontend will send the final reframed text and receive the AI-generated summary.
+⏳ Task 3.7: Implement logic to save the completed session (transcript, reframes, summary) to the Supabase database.
+
+Epic 4: The Toolkit - Lexicon Management
+
+✅ Task 4.1: Implement the "Lexicon" screen UI (app/(tabs)/lexicon.tsx) with a list of word pairs and stat cards.
+⏳ Task 4.2: Connect the Lexicon screen to Supabase to display the user's actual word pairs and calculate stats (frequency, total transformations).
+⏳ Task 4.3: Build the "Add New Word Pair" modal/screen.
+⏳ Task 4.4: Implement the logic to save new/edited word pairs to Supabase.
+Epic 5: The Progress - Dashboard & Gamification
+
+✅ Task 5.1: Implement the "Dashboard" screen UI (app/(tabs)/dashboard.tsx) with cards for metrics, a weekly chart, insights, and achievements.
+⏳ Task 5.2: Connect the Dashboard to Supabase to pull and display real user data (Day Streak, Weekly Duration, Reframing Rate).
+⏳ Task 5.3: Implement the backend logic to calculate and store user achievements based on their activity.
+⏳ Task 5.4: Implement the "Insight Engine" on the backend to generate simple, rule-based insights based on user data.
+Epic 6: The Guide - Settings & Support
+
+✅ Task 6.1: Implement the "Guide" (Settings) screen UI (app/(tabs)/guide.tsx) with categorized settings and an upgrade banner.
+⏳ Task 6.2: Implement the "Upgrade" flow by integrating RevenueCat and linking to a paywall screen.
+✅ Task 6.3: Implement user sign-out functionality.
+⏳ Task 6.4: Connect the "App Info" section to display dynamic data (e.g., total sessions from Supabase).
+
+4. Future Considerations (Out of Scope for V1)
+Auditory Reprogrammer: A "Sonic Weaver" feature that generates personalized audio sessions with binaural beats and subtle repetitions of the user's "New Words."
+Advanced AI Insights: Move beyond simple stats to complex pattern recognition (e.g., "We notice your mood improves on days you reframe words related to your career.").
+Community Features: Allow users to anonymously share their most effective word swaps, creating a "Community Lexicon" for inspiration.
+Push Notifications: Send motivational prompts or reminders based on user-set preferences.
+Data Export: Allow users to download their entire journal history as a CSV or JSON file.

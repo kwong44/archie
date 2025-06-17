@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
   User, 
@@ -10,10 +10,64 @@ import {
   ChevronRight, 
   Moon,
   Sparkles,
-  MessageCircle
+  MessageCircle,
+  LogOut
 } from 'lucide-react-native';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
 
+/**
+ * GuideScreen Component
+ * Settings and support screen with user profile management
+ * Includes sign-out functionality and app information
+ */
 export default function GuideScreen() {
+  const { session } = useAuth();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  /**
+   * Handles user sign-out with confirmation dialog
+   * Signs out from Supabase and clears the user session
+   */
+  const handleSignOut = async () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out? Your data will be saved and you can sign back in anytime.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            setIsSigningOut(true);
+            
+            try {
+              console.log('🔐 Signing out user');
+              
+              const { error } = await supabase.auth.signOut();
+              
+              if (error) {
+                console.error('❌ Sign-out error:', error);
+                Alert.alert('Sign Out Error', error.message);
+              } else {
+                console.log('✅ User signed out successfully');
+                // Navigation will be handled automatically by AuthContext
+              }
+            } catch (error) {
+              console.error('❌ Unexpected sign-out error:', error);
+              Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+            } finally {
+              setIsSigningOut(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const settingsSections = [
     {
       title: 'Personal',
@@ -37,6 +91,19 @@ export default function GuideScreen() {
         { icon: HelpCircle, label: 'Help & FAQ', description: 'Get answers to common questions' },
         { icon: Shield, label: 'Privacy & Security', description: 'Data protection and privacy' },
       ]
+    },
+    {
+      title: 'Account',
+      items: [
+        { 
+          icon: LogOut, 
+          label: 'Sign Out', 
+          description: 'Sign out of your account',
+          isSignOut: true,
+          onPress: handleSignOut,
+          disabled: isSigningOut
+        },
+      ]
     }
   ];
 
@@ -46,6 +113,13 @@ export default function GuideScreen() {
         <View style={styles.header}>
           <Text style={styles.title}>Guide</Text>
           <Text style={styles.subtitle}>Settings and support for your journey</Text>
+          
+          {/* User Info */}
+          {session?.user && (
+            <View style={styles.userInfo}>
+              <Text style={styles.userEmail}>{session.user.email}</Text>
+            </View>
+          )}
         </View>
 
         {/* Premium Banner */}
@@ -72,17 +146,44 @@ export default function GuideScreen() {
             <Text style={styles.sectionTitle}>{section.title}</Text>
             <View style={styles.sectionItems}>
               {section.items.map((item, itemIndex) => (
-                <TouchableOpacity key={itemIndex} style={styles.settingItem}>
+                <TouchableOpacity 
+                  key={itemIndex} 
+                  style={[
+                    styles.settingItem,
+                    item.isSignOut && styles.signOutItem,
+                    item.disabled && styles.disabledItem
+                  ]}
+                  onPress={item.onPress}
+                  disabled={item.disabled}
+                >
                   <View style={styles.settingLeft}>
-                    <View style={styles.settingIconContainer}>
-                      <item.icon color="#9CA3AF" size={20} strokeWidth={2} />
+                    <View style={[
+                      styles.settingIconContainer,
+                      item.isSignOut && styles.signOutIconContainer
+                    ]}>
+                      {item.disabled && isSigningOut ? (
+                        <ActivityIndicator color="#E53E3E" size="small" />
+                      ) : (
+                        <item.icon 
+                          color={item.isSignOut ? "#E53E3E" : "#9CA3AF"} 
+                          size={20} 
+                          strokeWidth={2} 
+                        />
+                      )}
                     </View>
                     <View style={styles.settingTextContainer}>
-                      <Text style={styles.settingLabel}>{item.label}</Text>
+                      <Text style={[
+                        styles.settingLabel,
+                        item.isSignOut && styles.signOutLabel
+                      ]}>
+                        {item.label}
+                      </Text>
                       <Text style={styles.settingDescription}>{item.description}</Text>
                     </View>
                   </View>
-                  <ChevronRight color="#6B7280" size={20} strokeWidth={2} />
+                  {!item.isSignOut && (
+                    <ChevronRight color="#6B7280" size={20} strokeWidth={2} />
+                  )}
                 </TouchableOpacity>
               ))}
             </View>
@@ -129,7 +230,7 @@ export default function GuideScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121820',
+    backgroundColor: '#121820', // Primary background color
   },
   scrollContent: {
     padding: 20,
@@ -140,16 +241,27 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontFamily: 'Inter-Bold',
-    color: '#F5F5F0',
+    color: '#F5F5F0', // Primary text color
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
     fontFamily: 'Inter-Regular',
-    color: '#9CA3AF',
+    color: '#9CA3AF', // Secondary text color
+  },
+  userInfo: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#374151', // Border color
+  },
+  userEmail: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#6B7280', // Tertiary text color
   },
   premiumBanner: {
-    backgroundColor: '#FFC300',
+    backgroundColor: '#FFC300', // Primary accent color
     borderRadius: 20,
     padding: 20,
     marginBottom: 30,
@@ -177,23 +289,23 @@ const styles = StyleSheet.create({
   premiumTitle: {
     fontSize: 18,
     fontFamily: 'Inter-Bold',
-    color: '#121820',
+    color: '#121820', // Dark text on light background
     marginBottom: 4,
   },
   premiumDescription: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
-    color: '#121820',
+    color: '#121820', // Dark text on light background
     opacity: 0.8,
   },
   premiumButton: {
-    backgroundColor: '#121820',
+    backgroundColor: '#121820', // Primary background color
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 12,
   },
   premiumButtonText: {
-    color: '#FFC300',
+    color: '#FFC300', // Primary accent color
     fontFamily: 'Inter-SemiBold',
     fontSize: 14,
   },
@@ -203,14 +315,14 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontFamily: 'Inter-SemiBold',
-    color: '#F5F5F0',
+    color: '#F5F5F0', // Primary text color
     marginBottom: 12,
   },
   sectionItems: {
-    backgroundColor: '#1F2937',
+    backgroundColor: '#1F2937', // Component background color
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: '#374151', // Border color
   },
   settingItem: {
     flexDirection: 'row',
@@ -218,7 +330,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#374151',
+    borderBottomColor: '#374151', // Border color
+  },
+  signOutItem: {
+    borderBottomWidth: 0, // Remove border for sign-out item as it's last
+  },
+  disabledItem: {
+    opacity: 0.6,
   },
   settingLeft: {
     flexDirection: 'row',
@@ -229,10 +347,13 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#374151',
+    backgroundColor: '#374151', // Border color
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+  },
+  signOutIconContainer: {
+    backgroundColor: 'rgba(229, 62, 62, 0.1)',
   },
   settingTextContainer: {
     flex: 1,
@@ -240,13 +361,16 @@ const styles = StyleSheet.create({
   settingLabel: {
     fontSize: 16,
     fontFamily: 'Inter-SemiBold',
-    color: '#F5F5F0',
+    color: '#F5F5F0', // Primary text color
     marginBottom: 2,
+  },
+  signOutLabel: {
+    color: '#E53E3E', // Error color for sign-out
   },
   settingDescription: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
-    color: '#9CA3AF',
+    color: '#9CA3AF', // Secondary text color
   },
   appInfo: {
     marginBottom: 30,
@@ -254,15 +378,15 @@ const styles = StyleSheet.create({
   appInfoTitle: {
     fontSize: 18,
     fontFamily: 'Inter-SemiBold',
-    color: '#F5F5F0',
+    color: '#F5F5F0', // Primary text color
     marginBottom: 16,
   },
   appInfoGrid: {
-    backgroundColor: '#1F2937',
+    backgroundColor: '#1F2937', // Component background color
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: '#374151', // Border color
   },
   appInfoItem: {
     flexDirection: 'row',
@@ -270,36 +394,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#374151',
+    borderBottomColor: '#374151', // Border color
   },
   appInfoLabel: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
-    color: '#9CA3AF',
+    color: '#9CA3AF', // Secondary text color
   },
   appInfoValue: {
     fontSize: 14,
     fontFamily: 'Inter-SemiBold',
-    color: '#F5F5F0',
+    color: '#F5F5F0', // Primary text color
   },
   philosophy: {
-    backgroundColor: '#1F2937',
+    backgroundColor: '#1F2937', // Component background color
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: '#374151', // Border color
     marginBottom: 20,
   },
   philosophyTitle: {
     fontSize: 18,
     fontFamily: 'Inter-SemiBold',
-    color: '#F5F5F0',
+    color: '#F5F5F0', // Primary text color
     marginBottom: 12,
   },
   philosophyText: {
     fontSize: 16,
     fontFamily: 'Inter-Regular',
-    color: '#F5F5F0',
+    color: '#F5F5F0', // Primary text color
     lineHeight: 24,
     marginBottom: 12,
     fontStyle: 'italic',
@@ -307,7 +431,7 @@ const styles = StyleSheet.create({
   philosophySignature: {
     fontSize: 14,
     fontFamily: 'Inter-SemiBold',
-    color: '#FFC300',
+    color: '#FFC300', // Primary accent color
     textAlign: 'right',
   },
 });

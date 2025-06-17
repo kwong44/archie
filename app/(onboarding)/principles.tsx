@@ -1,0 +1,311 @@
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import { OnboardingService } from '@/services/onboardingService';
+
+/**
+ * Core principles that guide user transformation
+ * These help establish the mindset framework for word reframing
+ */
+const DUMMY_PRINCIPLES = [
+  "I create my reality with my words.",
+  "Every challenge is an opportunity for growth.",
+  "I am the author of my own story.",
+  "I choose courage over comfort.",
+  "My focus determines my reality.",
+  "I speak with intention and purpose.",
+  "I am resilient and can overcome any setback.",
+  "I attract abundance by being grateful.",
+  "I transform limitations into possibilities.",
+  "My words shape my experience of life.",
+];
+
+/**
+ * PrinciplesScreen Component
+ * Allows users to select core beliefs that will guide their transformation
+ * Part of the onboarding flow before lexicon setup
+ * Saves selected principles to Supabase
+ */
+export default function PrinciplesScreen() {
+  const router = useRouter();
+  const { session } = useAuth();
+  const [selectedPrinciples, setSelectedPrinciples] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+
+  /**
+   * Toggles selection of a principle
+   * @param principle - The principle text to toggle
+   */
+  const togglePrinciple = (principle: string) => {
+    console.log('🎯 Toggling principle selection:', principle);
+    setSelectedPrinciples(prev => 
+      prev.includes(principle) 
+        ? prev.filter(p => p !== principle)
+        : [...prev, principle]
+    );
+  };
+
+  /**
+   * Renders a single principle item with selection state
+   */
+  const renderItem = ({ item }: { item: string }) => {
+    const isSelected = selectedPrinciples.includes(item);
+    return (
+      <TouchableOpacity 
+        style={[styles.item, isSelected && styles.itemSelected]} 
+        onPress={() => togglePrinciple(item)}
+        activeOpacity={0.7}
+        disabled={isSaving}
+      >
+        <Text style={[styles.itemText, isSelected && styles.itemTextSelected]}>
+          {item}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  /**
+   * Handles navigation to lexicon setup after principle selection
+   * Saves principles to Supabase before proceeding
+   */
+  const handleContinue = async () => {
+    if (!session?.user) {
+      console.error('❌ No authenticated user found');
+      Alert.alert('Error', 'Please log in to save your principles.');
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      console.log('✅ Saving principles to database:', selectedPrinciples);
+      
+      // Save principles to Supabase using our onboarding service
+      await OnboardingService.savePrinciples(session.user.id, selectedPrinciples);
+      
+      console.log('🎯 Principles saved successfully, navigating to lexicon setup');
+      
+      // Navigate to lexicon setup
+      router.push('/(onboarding)/lexicon-setup' as any);
+      
+    } catch (error) {
+      console.error('❌ Failed to save principles:', error);
+      Alert.alert(
+        'Save Error',
+        'Failed to save your principles. Please try again.',
+        [
+          { text: 'Skip for now', onPress: () => router.push('/(onboarding)/lexicon-setup' as any) },
+          { text: 'Retry', onPress: handleContinue },
+        ]
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  /**
+   * Handles skipping principle selection
+   */
+  const handleSkip = () => {
+    Alert.alert(
+      'Skip Principle Selection?',
+      'You can always define your principles later in the app settings.',
+      [
+        { text: 'Continue Setup', style: 'cancel' },
+        { 
+          text: 'Skip', 
+          onPress: () => {
+            console.log('⏭️ User skipped principle selection');
+            router.push('/(onboarding)/lexicon-setup' as any);
+          }
+        },
+      ]
+    );
+  };
+
+  const isButtonDisabled = selectedPrinciples.length < 3 || isSaving;
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <TouchableOpacity 
+            style={styles.skipButton} 
+            onPress={handleSkip}
+            disabled={isSaving}
+          >
+            <Text style={styles.skipButtonText}>Skip</Text>
+          </TouchableOpacity>
+        </View>
+        
+        <Text style={styles.title}>Define Your Principles</Text>
+        <Text style={styles.subtitle}>
+          Select the core beliefs that will guide your transformation. Choose at least three.
+        </Text>
+        
+        {/* Selection Counter */}
+        <View style={styles.counterContainer}>
+          <Text style={styles.counterText}>
+            {selectedPrinciples.length} of {DUMMY_PRINCIPLES.length} selected
+          </Text>
+        </View>
+      </View>
+
+      {/* Principles List */}
+      <FlatList
+        data={DUMMY_PRINCIPLES}
+        renderItem={renderItem}
+        keyExtractor={(item) => item}
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={!isSaving}
+      />
+
+      {/* Continue Button */}
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity 
+          style={[styles.button, isButtonDisabled && styles.buttonDisabled]}
+          onPress={handleContinue}
+          disabled={isButtonDisabled}
+          activeOpacity={0.8}
+        >
+          {isSaving ? (
+            <ActivityIndicator color="#121820" size="small" />
+          ) : (
+            <Text style={[styles.buttonText, isButtonDisabled && styles.buttonTextDisabled]}>
+              Continue to Lexicon Setup
+            </Text>
+          )}
+        </TouchableOpacity>
+        
+        {isButtonDisabled && !isSaving && (
+          <Text style={styles.helpText}>
+            Select at least {3 - selectedPrinciples.length} more principle{3 - selectedPrinciples.length !== 1 ? 's' : ''}
+          </Text>
+        )}
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#121820', // Primary background color
+  },
+  header: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  headerTop: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: 16,
+  },
+  skipButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(156, 163, 175, 0.1)',
+    borderWidth: 1,
+    borderColor: '#374151',
+  },
+  skipButtonText: {
+    color: '#9CA3AF', // Secondary text color
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+  },
+  title: {
+    fontSize: 32,
+    fontFamily: 'Inter-Bold',
+    color: '#F5F5F0', // Primary text color
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#9CA3AF', // Secondary text color
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  counterContainer: {
+    backgroundColor: '#1F2937', // Component background color
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#374151', // Border color
+  },
+  counterText: {
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+    color: '#FFC300', // Primary accent color
+  },
+  list: {
+    flex: 1,
+  },
+  listContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  item: {
+    backgroundColor: '#1F2937', // Component background color
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#374151', // Border color
+  },
+  itemSelected: {
+    backgroundColor: '#FFC300', // Primary accent color
+    borderColor: '#FFC300',
+  },
+  itemText: {
+    color: '#F5F5F0', // Primary text color
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    lineHeight: 22,
+  },
+  itemTextSelected: {
+    color: '#121820', // Dark text on light background
+    fontFamily: 'Inter-SemiBold',
+  },
+  buttonContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  button: {
+    backgroundColor: '#FFC300', // Primary accent color
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 8,
+    minHeight: 54,
+    justifyContent: 'center',
+  },
+  buttonDisabled: {
+    backgroundColor: '#374151', // Border color for disabled state
+  },
+  buttonText: {
+    color: '#121820', // Dark text on light background
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+  },
+  buttonTextDisabled: {
+    color: '#9CA3AF', // Secondary text color for disabled state
+  },
+  helpText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#6B7280', // Tertiary text color
+    textAlign: 'center',
+  },
+}); 

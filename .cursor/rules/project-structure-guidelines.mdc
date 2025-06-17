@@ -1,0 +1,49 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+## Current Project Structure
+
+.
+├── README.md
+├── app
+│   ├── (auth)
+│   │   ├── _layout.tsx
+│   │   ├── callback.tsx
+│   │   ├── index.tsx
+│   │   ├── login.tsx
+│   │   └── signup.tsx
+│   ├── (onboarding)
+│   │   ├── _layout.tsx
+│   │   ├── lexicon-setup.tsx
+│   │   └── principles.tsx
+│   ├── (tabs)
+│   │   ├── _layout.tsx
+│   │   ├── dashboard.tsx
+│   │   ├── guide.tsx
+│   │   ├── index.tsx
+│   │   └── lexicon.tsx
+│   ├── +not-found.tsx
+│   ├── _layout.tsx
+│   └── reframe.tsx
+├── app.json
+├── assets
+│   └── images
+│       ├── favicon.png
+│       └── icon.png
+├── context
+│   └── AuthContext.tsx
+├── docs
+│   └── database-schema.sql
+├── expo-env.d.ts
+├── hooks
+│   └── useFrameworkReady.ts
+├── lib
+│   └── supabase.ts
+├── package-lock.json
+├── package.json
+├── services
+│   ├── lexiconService.ts
+│   └── onboardingService.ts
+└── tsconfig.json

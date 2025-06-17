@@ -1,0 +1,84 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# The Architect: UI Guidelines
+
+This document outlines the visual styling and component standards for The Architect mobile application. Adhering to these guidelines ensures a consistent, high-quality user experience. The design system is based on a dark theme with vibrant, meaningful accent colors.
+
+## 1. Color Palette
+
+Our color palette is designed for clarity and visual appeal in a dark UI.
+
+### Primary Colors
+- **Background (`primary-background`):** `#121820` - The base color for all screens.
+- **Component Background (`component-background`):** `#1F2937` - Used for cards, sections, and input fields.
+- **Border (`border`):** `#374151` - For subtle separation of components.
+
+### Accent Colors
+- **Primary Accent (`accent-primary`):** `#FFC300` - Used for primary buttons, active states, and key highlights.
+- **Secondary Accent (`accent-secondary`):** `#4A90E2` - Used for informational icons and secondary highlights.
+- **Success (`accent-success`):** `#10B981` - Used for positive feedback and success states.
+
+### Text Colors
+- **Primary Text (`text-primary`):** `#F5F5F0` - For main titles and body text.
+- **Secondary Text (`text-secondary`):** `#9CA3AF` - For subtitles, descriptions, and less important labels.
+- **Tertiary/Inactive Text (`text-tertiary`):** `#6B7280` - For inactive tabs and placeholder text.
+
+### Utility Colors
+- **Error (`utility-error`):** `#E53E3E` - For error messages and validation failures.
+
+## 2. Typography
+
+We use the `Inter` font family, which is loaded in `app/_layout.tsx`.
+
+- **Font Family:** `Inter`
+- **Weights:**
+  - `Inter-Regular` (400)
+  - `Inter-SemiBold` (600)
+  - `Inter-Bold` (700)
+
+### Font Sizes & Styles
+- **Display Title:** 32px, `Inter-Bold`, `text-primary`
+- **Screen Subtitle:** 16px, `Inter-Regular`, `text-secondary`
+- **Section Title:** 24px, `Inter-Bold`, `text-primary`
+- **Card Title:** 18px, `Inter-SemiBold`, `text-primary`
+- **Body Text:** 16px, `Inter-Regular`, `text-primary`
+- **Label/Button Text:** 16px, `Inter-SemiBold`
+- **Input Text:** 16px, `Inter-Regular`, `text-primary`
+- **Description/Helper Text:** 14px, `Inter-Regular`, `text-secondary`
+
+## 3. Layout & Spacing
+
+- **Screen Padding:** Use a consistent padding of `20px` inside `SafeAreaView`.
+- **Component Spacing:** Use `gap` or `marginBottom` with multiples of 4 (e.g., 4, 8, 12, 16, 20, 24, 30).
+- **Standard `borderRadius`:** `16px` for cards and large components. `12px` for buttons.
+
+## 4. Component Styles
+
+### Buttons
+- **Primary Button:**
+  - `backgroundColor`: `accent-primary` (`#FFC300`)
+  - `color`: `primary-background` (`#121820`)
+  - `paddingVertical`: 16px
+  - `borderRadius`: 12px
+- **Disabled Button:**
+  - `backgroundColor`: `border` (`#374151`)
+  - `color`: `text-secondary` (`#9CA3AF`)
+
+### Text Inputs
+- `backgroundColor`: `component-background` (`#1F2937`)
+- `borderColor`: `border` (`#374151`)
+- `borderWidth`: 1px
+- `borderRadius`: 12px
+- `padding`: 16px
+- `color`: `text-primary` (`#F5F5F0`)
+- `placeholderTextColor`: `text-tertiary` (`#6B7280`)
+
+### Cards
+- `backgroundColor`: `component-background` (`#1F2937`)
+- `borderRadius`: 16px
+- `borderWidth`: 1px
+- `borderColor`: `border` (`#374151`)
+- `padding`: 20px

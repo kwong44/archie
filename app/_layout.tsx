@@ -5,6 +5,10 @@ import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import { createContextLogger } from '../lib/logger';
+
+// Create a context-specific logger for navigation workflows
+const navLogger = createContextLogger('RootLayout');
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -21,7 +25,7 @@ function RootLayoutNav() {
     const inOnboardingGroup = segments[0] === '(onboarding)';
     const inTabsGroup = segments[0] === '(tabs)';
 
-    console.log('🗺️ Navigation state:', {
+    navLogger.info('Navigation state evaluation', {
       hasSession: !!session,
       onboardingCompleted,
       currentGroup: segments[0],
@@ -33,19 +37,19 @@ function RootLayoutNav() {
     if (!session) {
       // User is not authenticated - redirect to auth
       if (!inAuthGroup) {
-        console.log('🔄 Redirecting to auth - no session');
+        navLogger.info('Redirecting to auth - no session');
         router.replace('/(auth)');
       }
     } else if (session && onboardingCompleted === false) {
       // User is authenticated but hasn't completed onboarding
       if (!inOnboardingGroup) {
-        console.log('🔄 Redirecting to onboarding - session exists but onboarding incomplete');
+        navLogger.info('Redirecting to onboarding - session exists but onboarding incomplete');
         router.replace('/(onboarding)/principles');
       }
     } else if (session && onboardingCompleted === true) {
       // User is authenticated and has completed onboarding
       if (!inTabsGroup) {
-        console.log('🔄 Redirecting to main app - session exists and onboarding complete');
+        navLogger.info('Redirecting to main app - session exists and onboarding complete');
         router.replace('/(tabs)');
       }
     }
@@ -75,6 +79,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
+      navLogger.debug('Fonts loaded, hiding splash screen');
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);

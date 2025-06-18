@@ -5,6 +5,11 @@ import { ArrowRight, Plus, Edit3, Calendar, TrendingUp } from 'lucide-react-nati
 import { useAuth } from '@/context/AuthContext';
 import { LexiconService, WordPair, LexiconStats } from '@/services/lexiconService';
 import { useFocusEffect } from '@react-navigation/native';
+import { AddWordPairModal } from '@/components/AddWordPairModal';
+import { createContextLogger } from '@/lib/logger';
+
+// Create context-specific logger for lexicon screen
+const lexiconLogger = createContextLogger('LexiconScreen');
 
 /**
  * Helper function to format relative time
@@ -39,20 +44,24 @@ export default function LexiconScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   /**
    * Loads word pairs and statistics from Supabase
    */
   const loadLexiconData = async (isRefresh = false) => {
     if (!session?.user) {
-      console.log('❌ No authenticated user found');
+      lexiconLogger.warn('No authenticated user found when loading lexicon data');
       setError('Please log in to view your lexicon');
       setLoading(false);
       return;
     }
 
     try {
-      console.log('📖 Loading lexicon data', { isRefresh });
+      lexiconLogger.info('Loading lexicon data', { 
+        userId: session.user.id, 
+        isRefresh 
+      });
       
       if (isRefresh) {
         setRefreshing(true);
@@ -71,13 +80,17 @@ export default function LexiconScreen() {
       setWordPairs(userWordPairs);
       setStats(lexiconStats);
 
-      console.log('✅ Lexicon data loaded successfully', {
+      lexiconLogger.info('Lexicon data loaded successfully', {
+        userId: session.user.id,
         wordPairsCount: userWordPairs.length,
         totalTransformations: lexiconStats.totalTransformations
       });
 
     } catch (error) {
-      console.error('❌ Failed to load lexicon data:', error);
+      lexiconLogger.error('Failed to load lexicon data', {
+        userId: session.user.id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
       setError(error instanceof Error ? error.message : 'Failed to load lexicon data');
     } finally {
       setLoading(false);
@@ -103,14 +116,39 @@ export default function LexiconScreen() {
 
   /**
    * Handles adding a new word pair
-   * TODO: Implement add word pair modal (Task 4.3)
+   * Opens the AddWordPairModal for user input
    */
   const handleAddWordPair = () => {
-    Alert.alert(
-      'Add Word Pair',
-      'Feature coming soon! You can add word pairs during the onboarding process for now.',
-      [{ text: 'OK' }]
-    );
+    lexiconLogger.info('Opening add word pair modal', { userId: session?.user?.id });
+    setShowAddModal(true);
+  };
+
+  /**
+   * Handles successful word pair addition
+   * Updates local state and refreshes data
+   */
+  const handleWordPairAdded = (newWordPair: WordPair) => {
+    lexiconLogger.info('Word pair added successfully, updating local state', {
+      wordPairId: newWordPair.id,
+      transformation: `${newWordPair.old_word} → ${newWordPair.new_word}`
+    });
+    
+    // Add the new word pair to the beginning of the list
+    setWordPairs(prev => [newWordPair, ...prev]);
+    
+    // Refresh stats to get updated counts
+    if (session?.user) {
+      LexiconService.getLexiconStats(session.user.id)
+        .then(updatedStats => {
+          setStats(updatedStats);
+          lexiconLogger.debug('Stats updated after word pair addition');
+        })
+        .catch(error => {
+          lexiconLogger.error('Failed to update stats after word pair addition', {
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        });
+    }
   };
 
   /**
@@ -286,6 +324,16 @@ export default function LexiconScreen() {
           ))}
         </View>
       </ScrollView>
+      
+      {/* Add Word Pair Modal */}
+      {session?.user && (
+        <AddWordPairModal
+          visible={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          onWordPairAdded={handleWordPairAdded}
+          userId={session.user.id}
+        />
+      )}
     </SafeAreaView>
   );
 }

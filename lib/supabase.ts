@@ -3,16 +3,53 @@ import * as SecureStore from 'expo-secure-store';
 import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
 
-// Define a custom storage adapter using Expo's SecureStore
+/**
+ * Custom storage adapter using Expo's SecureStore
+ * Provides secure, persistent storage for authentication tokens
+ * Handles all async operations properly with error handling
+ */
 const ExpoSecureStoreAdapter = {
-  getItem: (key: string) => {
-    return SecureStore.getItemAsync(key);
+  /**
+   * Retrieves an item from secure storage
+   * @param key - Storage key to retrieve
+   * @returns Promise resolving to the stored value or null
+   */
+  getItem: async (key: string): Promise<string | null> => {
+    try {
+      return await SecureStore.getItemAsync(key);
+    } catch (error) {
+      console.error('Error getting item from SecureStore:', error);
+      return null;
+    }
   },
-  setItem: (key: string, value: string) => {
-    SecureStore.setItemAsync(key, value);
+  
+  /**
+   * Stores an item in secure storage
+   * @param key - Storage key
+   * @param value - Value to store
+   * @returns Promise resolving when storage is complete
+   */
+  setItem: async (key: string, value: string): Promise<void> => {
+    try {
+      await SecureStore.setItemAsync(key, value);
+    } catch (error) {
+      console.error('Error setting item in SecureStore:', error);
+      throw error;
+    }
   },
-  removeItem: (key: string) => {
-    SecureStore.removeItemAsync(key);
+  
+  /**
+   * Removes an item from secure storage
+   * @param key - Storage key to remove
+   * @returns Promise resolving when removal is complete
+   */
+  removeItem: async (key: string): Promise<void> => {
+    try {
+      await SecureStore.deleteItemAsync(key);
+    } catch (error) {
+      console.error('Error removing item from SecureStore:', error);
+      // Don't throw error for removal failures to prevent auth issues
+    }
   },
 };
 
@@ -25,7 +62,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Supabase URL and/or anon key are not defined in app.json. Please add them to the 'extra' field.");
 }
 
-// Initialize and export the Supabase client
+/**
+ * Supabase client instance configured with secure storage
+ * Uses ExpoSecureStoreAdapter for token persistence
+ * Handles authentication state management automatically
+ */
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: ExpoSecureStoreAdapter,

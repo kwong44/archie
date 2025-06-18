@@ -27,7 +27,10 @@ This document establishes the coding standards for the Archie mobile application
 - **No Massive Files**: Maximum 500 lines per file - refactor into smaller modules
 - **Modular Architecture**: Each component/service should have a single responsibility
 - **Comment Everything**: Use JSDoc3 for all functions, complex logic, and business rules
-- **Log Everything**: Use Winston for comprehensive logging of all workflows
+- **Log Everything**: Use appropriate logging solutions for each environment:
+  - **React Native/Expo**: Use console logging with structured formats or React Native logging libraries
+  - **Node.js Backend**: Use Winston for comprehensive server-side logging
+  - **Python Backend**: Use Python's built-in logging module with JSON formatting
 
 ---
 
@@ -136,9 +139,10 @@ async function createJournalEntry(content, mood) {
 
 ### 5.1 Component Structure
 ```typescript
-// ✅ Good - Functional component with proper typing
+// ✅ Good - Functional component with proper typing and React Native logging
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
+import { logger } from '@/lib/logger';
 import { styles } from './UserCard.styles';
 
 interface UserCardProps {
@@ -235,9 +239,10 @@ const styles = StyleSheet.create({
 
 ### 6.1 Store Structure
 ```typescript
-// ✅ Good - Atomic store with proper typing
+// ✅ Good - Atomic store with proper typing and React Native logging
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
+import { logger } from '@/lib/logger';
 
 interface AuthState {
   user: User | null;
@@ -303,7 +308,7 @@ export const useAppStore = create((set) => ({
 
 ### 7.1 Supabase Service Pattern
 ```typescript
-// ✅ Good - Service with validation and error handling
+// ✅ Good - Service with validation and error handling using React Native logging
 import { supabase } from '@/lib/supabase';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
@@ -381,7 +386,7 @@ export const createEntry = async (data) => {
 
 ### 7.2 AI API Client Pattern
 ```typescript
-// ✅ Good - Dedicated AI client with auth
+// ✅ Good - Dedicated AI client with auth and React Native logging
 import { supabase } from './supabase';
 import { logger } from './logger';
 
@@ -501,19 +506,19 @@ export const RecordingScreen: React.FC = () => {
   const handleRecordingToggle = async () => {
     if (isRecording) {
       // Stop recording and save the audio file
-      logger.info('Stopping audio recording');
+      console.log('Stopping audio recording');
       await stopRecording();
     } else {
       // Request permissions before starting recording
       // This is required on both iOS and Android
       const hasPermission = await requestAudioPermission();
       if (!hasPermission) {
-        logger.warn('Audio permission denied');
+        console.warn('Audio permission denied');
         Alert.alert('Permission Required', 'Please enable microphone access');
         return;
       }
       
-      logger.info('Starting audio recording');
+      console.log('Starting audio recording');
       await startRecording();
     }
   };
@@ -526,51 +531,115 @@ export const RecordingScreen: React.FC = () => {
 
 ---
 
-## 9. Logging Standards (Winston)
+## 9. Logging Standards by Environment
 
-### 9.1 Logger Configuration
+### 9.1 React Native/Expo Logging
+
+For React Native/Expo applications, use structured console logging with optional remote logging services.
+
 ```typescript
-// ✅ Good - Centralized logger configuration
+// ✅ Good - Structured console logging for React Native
 // lib/logger.ts
-import winston from 'winston';
+
+interface LogEntry {
+  level: 'debug' | 'info' | 'warn' | 'error';
+  message: string;
+  timestamp: string;
+  service: string;
+  userId?: string;
+  metadata?: Record<string, any>;
+}
 
 /**
- * Winston logger instance configured for the Archie mobile app
- * Provides structured logging with different levels for debugging and monitoring
+ * React Native logger utility for structured logging
+ * Provides consistent logging format across the mobile app
  */
-export const logger = winston.createLogger({
-  level: __DEV__ ? 'debug' : 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.errors({ stack: true }),
-    winston.format.json()
-  ),
-  defaultMeta: { 
-    service: 'archie-mobile',
-    version: '1.0.0'
-  },
-  transports: [
-    new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize(),
-        winston.format.simple()
-      )
-    }),
-  ],
-});
+class Logger {
+  private service = 'archie-mobile';
+  private version = '1.0.0';
 
-// Add file transport for production
-if (!__DEV__) {
-  logger.add(new winston.transports.File({ 
-    filename: 'app-errors.log', 
-    level: 'error' 
-  }));
+  /**
+   * Creates a structured log entry
+   */
+  private createLogEntry(
+    level: LogEntry['level'],
+    message: string,
+    metadata: Record<string, any> = {}
+  ): LogEntry {
+    return {
+      level,
+      message,
+      timestamp: new Date().toISOString(),
+      service: this.service,
+      ...metadata,
+    };
+  }
+
+  /**
+   * Logs debug information (development only)
+   */
+  debug(message: string, metadata?: Record<string, any>): void {
+    if (__DEV__) {
+      const entry = this.createLogEntry('debug', message, metadata);
+      console.log('🐛 DEBUG:', JSON.stringify(entry, null, 2));
+    }
+  }
+
+  /**
+   * Logs general information
+   */
+  info(message: string, metadata?: Record<string, any>): void {
+    const entry = this.createLogEntry('info', message, metadata);
+    console.log('ℹ️ INFO:', JSON.stringify(entry, null, 2));
+  }
+
+  /**
+   * Logs warning messages
+   */
+  warn(message: string, metadata?: Record<string, any>): void {
+    const entry = this.createLogEntry('warn', message, metadata);
+    console.warn('⚠️ WARN:', JSON.stringify(entry, null, 2));
+  }
+
+  /**
+   * Logs error messages
+   */
+  error(message: string, metadata?: Record<string, any>): void {
+    const entry = this.createLogEntry('error', message, metadata);
+    console.error('❌ ERROR:', JSON.stringify(entry, null, 2));
+    
+    // In production, send to remote logging service
+    if (!__DEV__) {
+      this.sendToRemoteLogging(entry);
+    }
+  }
+
+  /**
+   * Sends critical logs to remote service in production
+   */
+  private async sendToRemoteLogging(entry: LogEntry): Promise<void> {
+    try {
+      // Example: Send to your logging API endpoint
+      await fetch(`${process.env.EXPO_PUBLIC_API_URL}/logs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry),
+      });
+    } catch (error) {
+      // Failsafe: Don't let logging errors crash the app
+      console.error('Failed to send log to remote service:', error);
+    }
+  }
 }
+
+export const logger = new Logger();
 ```
 
-### 9.2 Logging Usage
+### 9.2 React Native Logging Usage
 ```typescript
-// ✅ Good - Comprehensive logging throughout workflow
+// ✅ Good - Comprehensive logging throughout React Native workflow
+import { logger } from '@/lib/logger';
+
 export const LoginScreen: React.FC = () => {
   const navigation = useNavigation();
   const { setUser } = useAuthStore();
@@ -620,6 +689,91 @@ export const LoginScreen: React.FC = () => {
       setUser(data.user);
     }
   };
+```
+
+### 9.3 Node.js Backend Logging (Winston)
+
+For Node.js backend services, use Winston for comprehensive server-side logging.
+
+```typescript
+// ✅ Good - Winston configuration for Node.js backend
+// lib/logger.ts (Node.js backend only)
+import winston from 'winston';
+
+/**
+ * Winston logger instance configured for Node.js backend services
+ * Provides structured logging with different levels for debugging and monitoring
+ */
+export const logger = winston.createLogger({
+  level: process.env.NODE_ENV === 'development' ? 'debug' : 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.errors({ stack: true }),
+    winston.format.json()
+  ),
+  defaultMeta: { 
+    service: 'archie-backend',
+    version: '1.0.0'
+  },
+  transports: [
+    new winston.transports.Console({
+      format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.simple()
+      )
+    }),
+  ],
+});
+
+// Add file transport for production
+if (process.env.NODE_ENV === 'production') {
+  logger.add(new winston.transports.File({ 
+    filename: 'app-errors.log', 
+    level: 'error' 
+  }));
+}
+```
+
+### 9.4 Python Backend Logging
+
+For the Python FastAPI backend, use the built-in logging module with JSON formatting.
+
+```python
+# ✅ Good - Python logging configuration
+# logger.py (Python backend)
+import logging
+import json
+from pythonjsonlogger import jsonlogger
+
+# Get the logger instance
+logger = logging.getLogger("archie-ai-backend")
+logger.setLevel(logging.INFO)
+
+# Create a handler to output to console
+logHandler = logging.StreamHandler()
+
+# Create a JSON formatter and add it to the handler
+formatter = jsonlogger.JsonFormatter(
+    '%(asctime)s %(name)s %(levelname)s %(message)s'
+)
+logHandler.setFormatter(formatter)
+
+# Add the handler to the logger
+if not logger.handlers:
+    logger.addHandler(logHandler)
+
+# Usage example in FastAPI route
+@app.post("/api/summarize")
+async def summarize_text(request: Request):
+    logger.info("Summarize endpoint called", extra={'request_id': request.headers.get('x-request-id')})
+    
+    try:
+        # Business logic here
+        logger.info("Successfully generated summary")
+        return {"status": "success"}
+    except Exception as e:
+        logger.error("Error in summarize endpoint", extra={'error': str(e)}, exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 ```
 
 ---
@@ -730,7 +884,7 @@ export { LoginScreen as default };
 
 ### 12.1 Service Layer Error Handling
 ```typescript
-// ✅ Good - Comprehensive error handling with logging
+// ✅ Good - Comprehensive error handling with React Native logging
 export class UserService {
   static async updateProfile(
     userId: string, 
@@ -872,8 +1026,9 @@ describe('UserService', () => {
 
 ### 14.1 Component Optimization
 ```typescript
-// ✅ Good - Optimized component with memoization
+// ✅ Good - Optimized component with memoization and React Native logging
 import React, { memo, useMemo, useCallback } from 'react';
+import { logger } from '@/lib/logger';
 
 interface JournalEntryListProps {
   entries: JournalEntry[];

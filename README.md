@@ -165,7 +165,7 @@ node scripts/test-db.js
 
 1. Follow the styling guidelines in `.cursor/rules/styling-guidelines.mdc`
 2. Use the established services pattern for database operations
-3. Maintain comprehensive logging with Winston
+3. Maintain comprehensive logging with Python's built-in `logging` module configured with a `JSONFormatter`
 4. Test authentication flows thoroughly
 5. Update task completion status in `core-project-requirements.mdc`
 

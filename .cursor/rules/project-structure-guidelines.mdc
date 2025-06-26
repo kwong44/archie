@@ -6,6 +6,7 @@ alwaysApply: true
 ## Current Project Structure
 
 .
+├── AI_BACKEND_SETUP.md
 ├── README.md
 ├── app
 │   ├── (auth)
@@ -28,10 +29,27 @@ alwaysApply: true
 │   ├── _layout.tsx
 │   └── reframe.tsx
 ├── app.json
+├── archie-ai-backend
+│   ├── Dockerfile
+│   ├── README.md
+│   ├── app
+│   │   ├── __init__.py
+│   │   ├── auth.py
+│   │   ├── logger.py
+│   │   ├── models.py
+│   │   └── routers
+│   │       ├── __init__.py
+│   │       ├── ai_summary.py
+│   │       └── speech.py
+│   ├── env.example
+│   ├── main.py
+│   └── requirements.txt
 ├── assets
 │   └── images
 │       ├── favicon.png
 │       └── icon.png
+├── components
+│   └── AddWordPairModal.tsx
 ├── context
 │   └── AuthContext.tsx
 ├── docs
@@ -40,10 +58,13 @@ alwaysApply: true
 ├── hooks
 │   └── useFrameworkReady.ts
 ├── lib
+│   ├── aiApiClient.ts
+│   ├── logger.ts
 │   └── supabase.ts
 ├── package-lock.json
 ├── package.json
 ├── services
 │   ├── lexiconService.ts
-│   └── onboardingService.ts
+│   ├── onboardingService.ts
+│   └── sessionService.ts
 └── tsconfig.json

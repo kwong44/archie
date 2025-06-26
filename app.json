@@ -22,7 +22,8 @@
     },
     "extra": {
       "supabaseUrl": "https://khyzsnalrhibvbxdabqq.supabase.co",
-      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoeXpzbmFscmhpYnZieGRhYnFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxMzMwMzQsImV4cCI6MjA2NTcwOTAzNH0.p0ashW-IVA2ehKZFoz8ol1m7UJwOL5Z4NmvwHG8oFLs"
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoeXpzbmFscmhpYnZieGRhYnFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxMzMwMzQsImV4cCI6MjA2NTcwOTAzNH0.p0ashW-IVA2ehKZFoz8ol1m7UJwOL5Z4NmvwHG8oFLs",
+      "aiBackendUrl": "https://archie-ai-backend-325560983355.us-central1.run.app"
     }
   }
 }

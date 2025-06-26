@@ -1,32 +1,102 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Sparkles, RefreshCw } from 'lucide-react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import { useAuth } from '@/context/AuthContext';
+import { LexiconService, WordPair } from '@/services/lexiconService';
+import { SessionService, TransformationApplied } from '@/services/sessionService';
+import { createContextLogger } from '@/lib/logger';
+
+// Create context-specific logger for reframe screen
+const reframeLogger = createContextLogger('ReframeScreen');
 
 export default function ReframeScreen() {
   const router = useRouter();
+  const { session } = useAuth();
+  
   const [transcript, setTranscript] = useState(
     "I'm feeling really anxious about this presentation tomorrow. I'm worried I'm going to mess up and everyone will think I'm incompetent. I always get so stressed about these things, and I feel like I'm just not good enough for this job. It's overwhelming having so many expectations on me."
   );
   
   const [isReframing, setIsReframing] = useState(false);
   const [reframedWords, setReframedWords] = useState<{[key: string]: string}>({});
-  
-  // Identified "old words" that can be reframed
-  const oldWords = {
-    'anxious': 'excited',
-    'worried': 'preparing',
-    'stressed': 'energized',
-    'overwhelmed': 'full of opportunities',
-    'not good enough': 'still growing'
-  };
+  const [userLexicon, setUserLexicon] = useState<WordPair[]>([]);
+  const [loadingLexicon, setLoadingLexicon] = useState(true);
+  const [appliedTransformations, setAppliedTransformations] = useState<TransformationApplied[]>([]);
+  const [saving, setSaving] = useState(false);
 
-  const reframeWord = (oldWord: string, newWord: string) => {
+  /**
+   * Create a lookup object from user's lexicon for fast word matching
+   */
+  const lexiconLookup = userLexicon.reduce((acc, wordPair) => {
+    acc[wordPair.old_word.toLowerCase()] = {
+      newWord: wordPair.new_word,
+      lexiconId: wordPair.id
+    };
+    return acc;
+  }, {} as Record<string, { newWord: string; lexiconId: string }>);
+
+  /**
+   * Load user's lexicon data on component mount
+   */
+  useEffect(() => {
+    const loadUserLexicon = async () => {
+      if (!session?.user) {
+        reframeLogger.warn('No authenticated user, cannot load lexicon');
+        setLoadingLexicon(false);
+        return;
+      }
+
+      try {
+        reframeLogger.info('Loading user lexicon for reframing', {
+          userId: session.user.id
+        });
+
+        const wordPairs = await LexiconService.getUserWordPairs(session.user.id);
+        setUserLexicon(wordPairs);
+
+        reframeLogger.info('User lexicon loaded successfully', {
+          userId: session.user.id,
+          wordPairsCount: wordPairs.length
+        });
+
+      } catch (error) {
+        reframeLogger.error('Failed to load user lexicon', {
+          userId: session.user.id,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+        
+        Alert.alert(
+          'Error Loading Lexicon',
+          'Unable to load your word transformations. Please try again.',
+          [{ text: 'OK' }]
+        );
+      } finally {
+        setLoadingLexicon(false);
+      }
+    };
+
+    loadUserLexicon();
+  }, [session?.user]);
+
+  const reframeWord = (oldWord: string, newWord: string, lexiconId: string, position: number) => {
     setIsReframing(true);
     setTimeout(() => {
       setReframedWords(prev => ({ ...prev, [oldWord]: newWord }));
+      
+      // Track this transformation
+      setAppliedTransformations(prev => [
+        ...prev,
+        {
+          lexicon_id: lexiconId,
+          old_word: oldWord,
+          new_word: newWord,
+          position_in_text: position
+        }
+      ]);
+      
       setIsReframing(false);
     }, 500);
   };
@@ -43,20 +113,21 @@ export default function ReframeScreen() {
     const words = transcript.split(' ');
     return words.map((word, index) => {
       const cleanWord = word.toLowerCase().replace(/[.,!?]/g, '');
-      const isOldWord = oldWords.hasOwnProperty(cleanWord) || 
-                       Object.keys(oldWords).some(phrase => cleanWord.includes(phrase.split(' ')[0]));
-      const isReframed = reframedWords.hasOwnProperty(cleanWord) ||
-                        Object.keys(reframedWords).some(phrase => cleanWord.includes(phrase.split(' ')[0]));
+      const lexiconMatch = lexiconLookup[cleanWord];
+      const isOldWord = !!lexiconMatch;
+      const isReframed = reframedWords.hasOwnProperty(cleanWord);
       
       return (
         <TouchableOpacity
           key={index}
           onPress={() => {
-            if (isOldWord && !isReframed) {
-              const matchedOldWord = Object.keys(oldWords).find(phrase => 
-                cleanWord.includes(phrase.split(' ')[0])
-              ) || cleanWord;
-              reframeWord(matchedOldWord, oldWords[matchedOldWord]);
+            if (isOldWord && !isReframed && lexiconMatch) {
+              reframeWord(
+                cleanWord, 
+                lexiconMatch.newWord, 
+                lexiconMatch.lexiconId, 
+                index
+              );
             }
           }}
           style={[
@@ -70,7 +141,7 @@ export default function ReframeScreen() {
             isOldWord && !isReframed && styles.oldWordText,
             isReframed && styles.reframedWordText
           ]}>
-            {isReframed ? (reframedWords[cleanWord] || oldWords[cleanWord] || word) : word}
+            {isReframed ? reframedWords[cleanWord] : word}
           </Text>
         </TouchableOpacity>
       );
@@ -80,6 +151,67 @@ export default function ReframeScreen() {
   const generateSummary = () => {
     const reframedText = getDisplayText();
     return `You're preparing for an important presentation, feeling excited about the opportunity to share your work. This energy you're experiencing shows how much you care about doing well. Remember that growth happens when we step into new challenges, and you're exactly where you need to be in your journey. The expectations you feel are a sign that others believe in your capabilities.`;
+  };
+
+  /**
+   * Saves the current session including transformations and reframed text
+   */
+  const handleSaveSession = async () => {
+    if (!session?.user) {
+      Alert.alert('Error', 'You must be logged in to save sessions.');
+      return;
+    }
+
+    reframeLogger.info('Saving journal session', {
+      userId: session.user.id,
+      transformationsCount: appliedTransformations.length,
+      transcriptLength: transcript.length
+    });
+
+    setSaving(true);
+
+    try {
+      const reframedText = getDisplayText();
+      const aiSummary = generateSummary();
+
+      await SessionService.createSession(session.user.id, {
+        original_transcript: transcript,
+        reframed_text: reframedText,
+        ai_summary: aiSummary,
+        transformations_applied: appliedTransformations,
+        session_duration_seconds: 0, // TODO: Track actual duration
+      });
+
+      reframeLogger.info('Journal session saved successfully', {
+        userId: session.user.id,
+        sessionCompleted: true
+      });
+
+      Alert.alert(
+        'Session Saved!',
+        'Your reframing session has been saved successfully.',
+        [
+          {
+            text: 'Continue',
+            onPress: () => router.push('/(tabs)')
+          }
+        ]
+      );
+
+    } catch (error) {
+      reframeLogger.error('Failed to save journal session', {
+        userId: session.user.id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+
+      Alert.alert(
+        'Save Failed',
+        'Unable to save your session. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -96,18 +228,25 @@ export default function ReframeScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.transcriptContainer}>
-          <Text style={styles.sectionTitle}>Your Thoughts</Text>
-          <View style={styles.transcriptBox}>
-            <View style={styles.transcriptContent}>
-              {renderTranscriptWithHighlights()}
-            </View>
+        {loadingLexicon ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#FFC300" />
+            <Text style={styles.loadingText}>Loading your lexicon...</Text>
           </View>
-          
-          <Text style={styles.helpText}>
-            Tap the <Text style={styles.blueText}>blue highlighted words</Text> to reframe them with more empowering language
-          </Text>
-        </View>
+        ) : (
+          <>
+            <View style={styles.transcriptContainer}>
+              <Text style={styles.sectionTitle}>Your Thoughts</Text>
+              <View style={styles.transcriptBox}>
+                <View style={styles.transcriptContent}>
+                  {renderTranscriptWithHighlights()}
+                </View>
+              </View>
+              
+              <Text style={styles.helpText}>
+                Tap the <Text style={styles.blueText}>blue highlighted words</Text> to reframe them with more empowering language
+              </Text>
+            </View>
 
         {/* Word Transformations */}
         {Object.keys(reframedWords).length > 0 && (
@@ -147,12 +286,19 @@ export default function ReframeScreen() {
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={styles.primaryButton}
-            onPress={() => router.push('/(tabs)')}
+            style={[styles.primaryButton, saving && styles.primaryButtonDisabled]}
+            onPress={handleSaveSession}
+            disabled={saving}
           >
-            <Text style={styles.primaryButtonText}>Save & Continue</Text>
+            {saving ? (
+              <ActivityIndicator color="#121820" size="small" />
+            ) : (
+              <Text style={styles.primaryButtonText}>Save & Continue</Text>
+            )}
           </TouchableOpacity>
-        </View>
+            </View>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -336,9 +482,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  primaryButtonDisabled: {
+    backgroundColor: '#374151',
+  },
   primaryButtonText: {
     color: '#121820',
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 50,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#9CA3AF',
+    marginTop: 16,
   },
 });

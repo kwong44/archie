@@ -1,6 +1,6 @@
 # Archie AI Backend
 
-This is the Python/FastAPI backend service for The Architect mobile application. It handles Speech-to-Text transcription and AI-powered summary generation using Google Cloud services.
+This is the Python/FastAPI backend service for The Architect mobile application. It handles Speech-to-Text transcription and AI-powered summary generation using ElevenLabs and Google Gemini APIs.
 
 ## 🏗️ Architecture
 
@@ -12,7 +12,8 @@ This backend follows the **BaaS First** architecture principle:
 
 ## 🚀 Features
 
-- **Speech-to-Text**: Convert audio recordings to text using Google Cloud Speech API
+- **Speech-to-Text**: Convert audio recordings to text using ElevenLabs STT API
+- **Text-to-Speech**: Generate AI follow-up audio using ElevenLabs TTS API (Phase 2)
 - **AI Summaries**: Generate encouraging reflections using Google Gemini
 - **JWT Authentication**: Secure access using Supabase authentication tokens
 - **Structured Logging**: Comprehensive JSON logging for monitoring
@@ -23,7 +24,7 @@ This backend follows the **BaaS First** architecture principle:
 ### Prerequisites
 
 - Python 3.11+
-- Google Cloud Account with Speech API enabled
+- ElevenLabs account with API access
 - Google Gemini API access
 - Supabase project with JWT secret
 
@@ -51,11 +52,11 @@ This backend follows the **BaaS First** architecture principle:
    # Edit .env with your actual values
    ```
 
-5. **Set up Google Cloud credentials:**
+5. **Set up ElevenLabs API key:**
    ```bash
-   # Download service account key from Google Cloud Console
-   # Set GOOGLE_APPLICATION_CREDENTIALS to the key file path
-   export GOOGLE_APPLICATION_CREDENTIALS="path/to/service-account-key.json"
+   # Get your API key from ElevenLabs dashboard
+   # Add it to your .env file
+   echo "ELEVENLABS_API_KEY=your_api_key_here" >> .env
    ```
 
 ### Environment Variables
@@ -63,8 +64,7 @@ This backend follows the **BaaS First** architecture principle:
 ```bash
 # Required
 SUPABASE_JWT_SECRET=your_supabase_jwt_secret
-GOOGLE_CLOUD_PROJECT_ID=your_project_id
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
+ELEVENLABS_API_KEY=your_elevenlabs_api_key
 GEMINI_API_KEY=your_gemini_api_key
 
 # Optional
@@ -85,12 +85,23 @@ Authorization: Bearer <your-supabase-jwt-token>
 ### Speech-to-Text
 
 **POST** `/api/speech/transcribe`
-- Upload audio file for transcription
-- Supports: WAV, MP3, FLAC, OGG, WebM
+- Upload audio file for transcription using ElevenLabs STT
+- Supports: WAV, MP3, FLAC, OGG, WebM, M4A
+- Max duration: 60 seconds (ElevenLabs limit)
 - Returns: transcript, confidence score, processing time
 
 **GET** `/api/speech/formats`
 - Get supported audio formats and recommendations
+
+### Text-to-Speech (Phase 2)
+
+**POST** `/api/speech/synthesize`
+- Convert text to speech using ElevenLabs TTS
+- Input: text, optional voice_id
+- Returns: base64-encoded MP3 audio, processing time
+
+**GET** `/api/speech/voices`
+- Get available voices for TTS synthesis
 
 ### AI Summary
 
@@ -148,7 +159,7 @@ docker run -p 8000:8000 --env-file .env archie-ai-backend
      --platform managed \
      --region us-central1 \
      --allow-unauthenticated \
-     --set-env-vars SUPABASE_JWT_SECRET=your_secret,GEMINI_API_KEY=your_key
+     --set-env-vars SUPABASE_JWT_SECRET=your_secret,ELEVENLABS_API_KEY=your_key,GEMINI_API_KEY=your_key
    ```
 
 ## 🔧 Integration with Frontend
@@ -211,9 +222,9 @@ curl -X POST "http://localhost:8000/api/ai/summarize" \
 1. **"JWT Secret not configured"**
    - Ensure `SUPABASE_JWT_SECRET` is set in environment variables
 
-2. **"Google Cloud authentication failed"**
-   - Verify `GOOGLE_APPLICATION_CREDENTIALS` points to valid service account key
-   - Ensure Speech API is enabled in your Google Cloud project
+2. **"ElevenLabs API authentication failed"**
+   - Verify `ELEVENLABS_API_KEY` is valid and has proper permissions
+   - Check your ElevenLabs account quota and billing status
 
 3. **"Gemini API not available"**
    - Check `GEMINI_API_KEY` is valid and has proper permissions

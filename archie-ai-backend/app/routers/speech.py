@@ -1,16 +1,15 @@
 """
 Speech-to-Text Router
-Handles audio file transcription using Google Cloud Speech API
-Implements Task 3.4: Speech-to-Text integration
+Handles audio file transcription using ElevenLabs API
+Implements Task 3.4: Speech-to-Text integration with ElevenLabs migration
 """
 
 import os
 import time
-import tempfile
 from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from google.cloud import speech
+from elevenlabs import ElevenLabs
 
 from ..auth import verify_jwt, get_user_id_from_token
 from ..models import SpeechToTextResponse, TranscriptionError
@@ -20,8 +19,8 @@ from ..logger import logger
 router = APIRouter()
 security = HTTPBearer()
 
-# Initialize Google Cloud Speech client
-speech_client = speech.SpeechClient()
+# Initialize ElevenLabs client
+eleven = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
 
 
 @router.post("/transcribe", response_model=SpeechToTextResponse)
@@ -31,13 +30,13 @@ async def transcribe_audio(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> SpeechToTextResponse:
     """
-    Transcribe audio file to text using Google Cloud Speech API
+    Transcribe audio file to text using ElevenLabs Speech-to-Text API
     
     Requires authentication via Supabase JWT token
-    Supports various audio formats (wav, mp3, flac, etc.)
+    Supports various audio formats with 60-second limit
     
     Args:
-        audio_file: Uploaded audio file to transcribe
+        audio_file: Uploaded audio file to transcribe (max 60 seconds)
         language_code: Language code for transcription (default: en-US)
         credentials: JWT authentication credentials
         
@@ -53,24 +52,25 @@ async def transcribe_audio(
     # Verify authentication and get user ID
     user_id = get_user_id_from_token(credentials)
     
-    logger.info("Speech transcription request initiated", extra={
+    logger.info("ElevenLabs STT transcription request initiated", extra={
         'user_id': user_id,
         'filename': audio_file.filename,
         'content_type': audio_file.content_type,
         'language_code': language_code
     })
     
-    # Validate file type
+    # Validate file type - ElevenLabs supports common audio formats
     allowed_types = [
         'audio/wav', 'audio/wave', 'audio/x-wav',
         'audio/mpeg', 'audio/mp3',
         'audio/flac',
         'audio/ogg',
-        'audio/webm'
+        'audio/webm',
+        'audio/m4a'
     ]
     
     if audio_file.content_type not in allowed_types:
-        logger.warning("Unsupported audio format", extra={
+        logger.warning("Unsupported audio format for ElevenLabs", extra={
             'user_id': user_id,
             'content_type': audio_file.content_type,
             'filename': audio_file.filename
@@ -86,50 +86,44 @@ async def transcribe_audio(
         audio_content = await audio_file.read()
         file_size = len(audio_content)
         
-        logger.info("Audio file loaded for transcription", extra={
+        # Check file size limit (ElevenLabs has limits)
+        max_file_size = 10 * 1024 * 1024  # 10MB limit
+        if file_size > max_file_size:
+            logger.warning("Audio file too large for ElevenLabs", extra={
+                'user_id': user_id,
+                'file_size_bytes': file_size,
+                'max_size_bytes': max_file_size
+            })
+            raise HTTPException(
+                status_code=400,
+                detail=f"Audio file too large. Maximum size: {max_file_size // (1024*1024)}MB"
+            )
+        
+        logger.info("Audio file loaded for ElevenLabs transcription", extra={
             'user_id': user_id,
             'file_size_bytes': file_size,
             'filename': audio_file.filename
         })
         
-        # Configure transcription settings
-        audio = speech.RecognitionAudio(content=audio_content)
-        
-        # Determine encoding from content type
-        encoding_map = {
-            'audio/wav': speech.RecognitionConfig.AudioEncoding.LINEAR16,
-            'audio/wave': speech.RecognitionConfig.AudioEncoding.LINEAR16,
-            'audio/x-wav': speech.RecognitionConfig.AudioEncoding.LINEAR16,
-            'audio/mpeg': speech.RecognitionConfig.AudioEncoding.MP3,
-            'audio/mp3': speech.RecognitionConfig.AudioEncoding.MP3,
-            'audio/flac': speech.RecognitionConfig.AudioEncoding.FLAC,
-            'audio/ogg': speech.RecognitionConfig.AudioEncoding.OGG_OPUS,
-            'audio/webm': speech.RecognitionConfig.AudioEncoding.WEBM_OPUS
-        }
-        
-        encoding = encoding_map.get(audio_file.content_type, 
-                                   speech.RecognitionConfig.AudioEncoding.LINEAR16)
-        
-        config = speech.RecognitionConfig(
-            encoding=encoding,
-            sample_rate_hertz=16000,  # Standard sample rate
-            language_code=language_code,
-            enable_automatic_punctuation=True,
-            enable_word_confidence=True,
-            model="latest_long"  # Best model for longer audio
-        )
-        
-        logger.info("Starting Google Cloud Speech transcription", extra={
+        logger.info("Starting ElevenLabs STT transcription", extra={
             'user_id': user_id,
-            'encoding': encoding.name,
+            'model': 'eleven_multilingual_v1',
             'language_code': language_code
         })
         
-        # Perform transcription
-        response = speech_client.recognize(config=config, audio=audio)
+        # Perform ElevenLabs batch STT transcription
+        response = eleven.speech_to_text.convert(
+            audio=audio_content,
+            model_id="eleven_multilingual_v1",  # ElevenLabs multilingual model
+            language=language_code
+        )
         
-        if not response.results:
-            logger.warning("No transcription results returned", extra={
+        # Extract transcript and confidence from ElevenLabs response
+        transcript = response.text if hasattr(response, 'text') else str(response)
+        confidence = getattr(response, 'score', 0.9)  # Default confidence if not provided
+        
+        if not transcript or transcript.strip() == "":
+            logger.warning("No transcription results from ElevenLabs", extra={
                 'user_id': user_id,
                 'file_size_bytes': file_size
             })
@@ -138,15 +132,9 @@ async def transcribe_audio(
                 detail="No speech detected in audio file. Please ensure the audio is clear and contains speech."
             )
         
-        # Extract the best transcript
-        result = response.results[0]
-        alternative = result.alternatives[0]
-        transcript = alternative.transcript
-        confidence = alternative.confidence
-        
         processing_time = int((time.time() - start_time) * 1000)
         
-        logger.info("Speech transcription completed successfully", extra={
+        logger.info("ElevenLabs STT transcription completed successfully", extra={
             'user_id': user_id,
             'transcript_length': len(transcript),
             'confidence': confidence,
@@ -154,7 +142,7 @@ async def transcribe_audio(
         })
         
         return SpeechToTextResponse(
-            transcript=transcript,
+            transcript=transcript.strip(),
             confidence=confidence,
             processing_time_ms=processing_time
         )
@@ -162,7 +150,7 @@ async def transcribe_audio(
     except Exception as e:
         processing_time = int((time.time() - start_time) * 1000)
         
-        logger.error("Speech transcription failed", extra={
+        logger.error("ElevenLabs STT transcription failed", extra={
             'user_id': user_id,
             'error': str(e),
             'processing_time_ms': processing_time,
@@ -170,15 +158,21 @@ async def transcribe_audio(
         }, exc_info=True)
         
         # Return appropriate error based on exception type
-        if "quota" in str(e).lower() or "limit" in str(e).lower():
+        error_message = str(e).lower()
+        if "quota" in error_message or "limit" in error_message or "rate" in error_message:
             raise HTTPException(
                 status_code=429,
                 detail="Transcription service temporarily unavailable. Please try again later."
             )
-        elif "billing" in str(e).lower():
+        elif "unauthorized" in error_message or "api key" in error_message:
             raise HTTPException(
                 status_code=503,
                 detail="Transcription service configuration error. Please contact support."
+            )
+        elif "audio" in error_message and ("format" in error_message or "invalid" in error_message):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid audio format or corrupted file. Please try a different audio file."
             )
         else:
             raise HTTPException(
@@ -192,7 +186,7 @@ async def get_supported_formats(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> Dict[str, Any]:
     """
-    Get list of supported audio formats for transcription
+    Get list of supported audio formats for ElevenLabs transcription
     
     Args:
         credentials: JWT authentication credentials
@@ -230,12 +224,18 @@ async def get_supported_formats(
                 "format": "WebM",
                 "mime_types": ["audio/webm"],
                 "description": "WebM audio format"
+            },
+            {
+                "format": "M4A",
+                "mime_types": ["audio/m4a"],
+                "description": "MPEG-4 Audio format"
             }
         ],
         "recommendations": {
-            "sample_rate": "16000 Hz for best results",
-            "channels": "Mono preferred",
+            "sample_rate": "16000 Hz or higher for best results",
+            "channels": "Mono or stereo supported",
             "max_file_size": "10 MB",
-            "max_duration": "60 seconds for real-time processing"
+            "max_duration": "60 seconds (ElevenLabs limit)",
+            "provider": "ElevenLabs Speech-to-Text API"
         }
     } 

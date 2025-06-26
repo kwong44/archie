@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 
 from app.logger import logger
 from app.auth import verify_jwt
-from app.routers import speech, ai_summary
+from app.routers import speech, ai_summary, tts
 from app.models import HealthResponse
 
 # Load environment variables
@@ -31,8 +31,7 @@ async def lifespan(app: FastAPI):
     # Startup: Verify required environment variables
     required_env_vars = [
         'SUPABASE_JWT_SECRET',
-        'GOOGLE_CLOUD_PROJECT_ID', 
-        'GOOGLE_APPLICATION_CREDENTIALS',
+        'ELEVENLABS_API_KEY',
         'GEMINI_API_KEY'
     ]
     
@@ -76,6 +75,7 @@ security = HTTPBearer()
 
 # Include routers
 app.include_router(speech.router, prefix="/api/speech", tags=["speech"])
+app.include_router(tts.router, prefix="/api/speech", tags=["speech"])
 app.include_router(ai_summary.router, prefix="/api/ai", tags=["ai"])
 
 @app.get("/", response_model=HealthResponse)
@@ -101,7 +101,7 @@ async def health_check():
     
     try:
         # TODO: Add actual service health checks here
-        # - Google Cloud Speech API connectivity
+        # - ElevenLabs API connectivity
         # - Gemini API connectivity
         
         logger.info("Health check completed successfully")

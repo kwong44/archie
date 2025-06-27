@@ -97,7 +97,7 @@ export interface TTSResponse {
 export const aiApiClient = {
   
   /**
-   * Convert audio file to text using Google Cloud Speech API
+   * Convert audio file to text using ElevenLabs API
    * Implements Task 3.4: Speech-to-Text integration
    * 
    * @param request SpeechToTextRequest with audio URI and options
@@ -121,17 +121,39 @@ export const aiApiClient = {
       // Create FormData for file upload
       const formData = new FormData();
       
-      // Read the audio file and create a blob
-      const response = await fetch(request.audioUri);
-      const audioBlob = await response.blob();
+      // For React Native/Expo, we need to use the URI directly for FormData
+      // The fetch() approach doesn't work with expo-av file URIs
+      const audioUri = request.audioUri;
       
-      formData.append('audio_file', audioBlob, 'recording.wav');
+      // Determine file extension and MIME type from the URI
+      const fileName = audioUri.split('/').pop() || 'recording.m4a';
+      const fileExtension = fileName.split('.').pop()?.toLowerCase();
+      
+      // Map file extensions to MIME types
+      const mimeTypeMap: { [key: string]: string } = {
+        'm4a': 'audio/m4a',
+        'wav': 'audio/wav',
+        'mp3': 'audio/mpeg',
+        'aac': 'audio/aac'
+      };
+      
+      const mimeType = mimeTypeMap[fileExtension || 'm4a'] || 'audio/m4a';
+      
+      // For React Native, we can pass the file URI directly to FormData
+      // This works with expo-av generated file URIs
+      formData.append('audio_file', {
+        uri: audioUri,
+        type: mimeType,
+        name: fileName,
+      } as any);
       formData.append('language_code', request.languageCode || 'en-US');
       
       logger.info('Sending audio file to AI backend for transcription', {
         context: 'aiApiClient',
         operation: 'transcribeAudio',
-        audioSize: audioBlob.size,
+        audioUri: audioUri,
+        fileName: fileName,
+        mimeType: mimeType,
         languageCode: request.languageCode || 'en-US'
       });
       

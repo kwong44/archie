@@ -203,9 +203,48 @@ async def generate(request: Request, token: HTTPAuthorizationCredentials = Depen
 ## 7. Third-Party Services & DevOps
 
 *   **AI Services:**
-    *   Google Cloud Speech-to-Text
-    *   Google Cloud Natural Language
-    *   Google Gemini API
+    *   **ElevenLabs:** Primary provider for Speech-to-Text (STT) and Text-to-Speech (TTS) capabilities
+        *   **STT Model:** `eleven_multilingual_v1` for batch audio transcription
+        *   **TTS Model:** `eleven_multilingual_v2` for AI follow-up voice synthesis
+        *   **Rule:** All ElevenLabs API calls **MUST** be routed through the Python backend for security
+        *   **Authentication:** API key stored as environment variable `ELEVENLABS_API_KEY`
+    *   **Google Gemini API:** For AI-powered text processing and summarization
+        *   **Rule:** Continue using for journal entry processing and lexicon reframing
 *   **Payments:** RevenueCat (for managing in-app subscriptions).
 *   **Push Notifications:** Firebase Cloud Messaging (FCM) (via Expo's `expo-notifications` library).
 *   **CI/CD:** GitHub Actions (for automating tests, linting, and deployments).
+
+---
+
+## 8. ElevenLabs Integration Architecture
+
+Following our **Isolate AI** principle, ElevenLabs integration is handled exclusively through the Python backend:
+
+### 8.1 Speech-to-Text Flow
+1. **Frontend:** Records audio using `expo-av` (≤60s limit for ElevenLabs)
+2. **Backend:** Receives audio file via `/api/speech/transcribe` endpoint
+3. **ElevenLabs:** Processes batch STT using `eleven.speech_to_text.convert()`
+4. **Response:** Returns transcript with confidence score to frontend
+
+### 8.2 Text-to-Speech Flow (Phase 2)
+1. **Frontend:** Sends AI-generated follow-up text to `/api/speech/synthesize`
+2. **Backend:** Uses ElevenLabs TTS to generate audio
+3. **Response:** Returns base64-encoded MP3 audio for playback
+4. **Playback:** Frontend uses `expo-av` to play synthesized audio
+
+### 8.3 Environment Configuration
+```python
+# Required environment variables for ElevenLabs integration
+ELEVENLABS_API_KEY=your_eleven_labs_api_key_here
+
+# Backend configuration in main.py
+from elevenlabs import ElevenLabs
+eleven = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
+```
+
+### 8.4 Security & Performance Rules
+*   **Authentication:** All ElevenLabs endpoints **MUST** validate Supabase JWT tokens
+*   **Rate Limiting:** Implement appropriate rate limiting for audio processing endpoints
+*   **Audio Limits:** Enforce 60-second maximum audio duration (ElevenLabs constraint)
+*   **Error Handling:** Provide graceful fallbacks for API failures
+*   **Logging:** Log all ElevenLabs API interactions with user context and performance metrics

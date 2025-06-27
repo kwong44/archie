@@ -197,6 +197,33 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Function to atomically increment word pair usage count
+CREATE OR REPLACE FUNCTION public.increment_word_pair_usage(
+  user_id UUID,
+  word_pair_id UUID
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  -- Increment usage count for the specified word pair
+  -- Only allow users to increment their own word pairs
+  UPDATE public.user_lexicon
+  SET 
+    usage_count = usage_count + 1,
+    updated_at = NOW()
+  WHERE 
+    id = word_pair_id 
+    AND user_id = increment_word_pair_usage.user_id;
+    
+  -- Check if any row was updated
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Word pair not found or access denied';
+  END IF;
+END;
+$$;
+
 -- Triggers for updated_at timestamps
 CREATE TRIGGER handle_user_profiles_updated_at
     BEFORE UPDATE ON public.user_profiles

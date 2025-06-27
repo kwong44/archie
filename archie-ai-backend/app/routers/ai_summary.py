@@ -40,16 +40,64 @@ async def generate_summary(
         raise HTTPException(status_code=503, detail="AI service unavailable")
     
     try:
-        prompt = f"""You are The Architect's AI Guide. A user just completed a reframing session.
+        # Build a more sophisticated prompt with context
+        transformations_made = ""
+        if request.transformation_count and request.transformation_count > 0:
+            transformations_made = f"\n\nThe user made {request.transformation_count} language transformation(s) during this session."
+        
+        principles_context = ""
+        if request.user_principles and len(request.user_principles) > 0:
+            principles_context = f"\n\nUser's core principles: {', '.join(request.user_principles)}"
+        
+        # Check if any actual reframing occurred
+        text_changed = request.reframed_text != request.original_text
+        
+        prompt = f"""You are The Architect's AI Guide - a wise, encouraging mentor who helps people transform their language to reshape their reality.
 
-Original text: "{request.original_text}"
-Reframed text: "{request.reframed_text or request.original_text}"
+A user just completed a reframing session where they examined their internal dialogue and consciously chose more empowering language.
 
-Provide a brief, encouraging 2-3 sentence reflection that celebrates their practice of conscious language transformation."""
+ORIGINAL THOUGHTS:
+"{request.original_text}"
+
+REFRAMED THOUGHTS:
+"{request.reframed_text or request.original_text}"{transformations_made}{principles_context}
+
+Your role is to provide a personalized, insightful reflection (2-3 sentences) that:
+1. Acknowledges their specific journey and growth
+2. Highlights the power of their conscious language choices
+3. Encourages continued practice of self-authorship
+4. Connects their work to larger themes of personal empowerment
+
+Be warm, wise, and specific to their actual experience. Focus on the mindset shift they're creating, not just generic encouragement."""
+
+        logger.info("Sending prompt to Gemini", extra={
+            'user_id': user_id,
+            'prompt_length': len(prompt),
+            'has_transformations': bool(request.transformation_count),
+            'has_principles': bool(request.user_principles),
+            'text_changed': text_changed
+        })
+        
+        # Debug log the full prompt in development
+        logger.debug("Full Gemini prompt", extra={
+            'user_id': user_id,
+            'prompt': prompt
+        })
 
         response = model.generate_content(prompt)
         summary = response.text.strip()
         processing_time = int((time.time() - start_time) * 1000)
+        
+        logger.info("Gemini response received", extra={
+            'user_id': user_id,
+            'response_length': len(summary),
+            'processing_time_ms': processing_time
+        })
+        
+        logger.debug("Full Gemini response", extra={
+            'user_id': user_id,
+            'response': summary
+        })
         
         return AISummaryResponse(
             summary=summary,

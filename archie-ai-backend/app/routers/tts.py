@@ -4,9 +4,10 @@ Handles AI follow-up question synthesis for Phase 2 implementation
 """
 import os
 import time
+import base64
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from elevenlabs import ElevenLabs
+from elevenlabs.client import ElevenLabs
 from pydantic import BaseModel
 
 from ..auth import get_user_id_from_token
@@ -94,13 +95,16 @@ async def synthesize_text(
             'voice_id': request.voice_id
         })
         
-        # Perform ElevenLabs TTS synthesis
-        audio_data = eleven.text_to_speech.convert(
+        # Perform ElevenLabs TTS synthesis using the generate method
+        audio_generator = eleven.generate(
             text=request.text,
-            voice_id=request.voice_id,
-            model_id="eleven_multilingual_v2",
+            voice=request.voice_id,  # Voice ID or name
+            model="eleven_multilingual_v2",  # Updated model parameter name
             output_format="mp3_44100_128"
         )
+        
+        # Convert generator to bytes
+        audio_data = b"".join(audio_generator)
         
         processing_time = int((time.time() - start_time) * 1000)
         
@@ -112,7 +116,7 @@ async def synthesize_text(
         })
         
         return TTSResponse(
-            audio_base64=audio_data,  # ElevenLabs returns base64 by default
+            audio_base64=base64.b64encode(audio_data).decode('utf-8'),
             processing_time_ms=processing_time,
             voice_id=request.voice_id
         )

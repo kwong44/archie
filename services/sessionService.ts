@@ -139,12 +139,25 @@ export class SessionService {
     });
 
     try {
-      const usageRecords = transformations.map(transformation => ({
+      // Deduplicate transformations to prevent unique constraint violations
+      // Group by session_id + lexicon_id + old_word_instance (the unique constraint)
+      const uniqueTransformations = transformations.reduce((acc, transformation) => {
+        const key = `${transformation.lexicon_id}_${transformation.old_word.toLowerCase()}`;
+        
+        // Keep the first occurrence of each unique transformation
+        if (!acc.has(key)) {
+          acc.set(key, transformation);
+        }
+        
+        return acc;
+      }, new Map<string, TransformationApplied>());
+
+      const usageRecords = Array.from(uniqueTransformations.values()).map(transformation => ({
         user_id: userId,
         lexicon_id: transformation.lexicon_id,
         session_id: sessionId,
-        old_word_instance: transformation.old_word,
-        new_word_instance: transformation.new_word,
+        old_word_instance: transformation.old_word.toLowerCase(),
+        new_word_instance: transformation.new_word.toLowerCase(),
         context_before: `Position ${transformation.position_in_text}`,
         context_after: null,
       }));
@@ -157,9 +170,20 @@ export class SessionService {
         sessionLogger.error('Failed to track transformation usage', {
           userId,
           sessionId,
-          error: error.message
+          error: error.message,
+          errorCode: error.code
         });
-        throw new Error(`Failed to track transformations: ${error.message}`);
+        
+        // Handle specific error cases gracefully
+        if (error.code === '23505') {
+          // Duplicate key error - log warning but don't fail the session
+          sessionLogger.warn('Duplicate transformation usage record detected, skipping', {
+            userId,
+            sessionId
+          });
+        } else {
+          throw new Error(`Failed to track transformations: ${error.message}`);
+        }
       }
 
       sessionLogger.info('Transformation usage tracked successfully', {

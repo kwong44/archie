@@ -227,8 +227,9 @@ export class LexiconService {
   /**
    * Increments the usage count for a word pair
    * Called when a word transformation is applied in a session
+   * Uses the secure Supabase RPC function for atomic updates
    * 
-   * @param userId - The authenticated user's ID
+   * @param userId - The authenticated user's ID (used for security validation)
    * @param wordPairId - The ID of the word pair used
    * @returns Promise resolving to the updated word pair
    */
@@ -236,25 +237,29 @@ export class LexiconService {
     userId: string,
     wordPairId: string
   ): Promise<WordPair> {
-    console.log('📈 Incrementing word pair usage', { userId, wordPairId });
+    console.log('📈 Incrementing word pair usage via RPC function', { userId, wordPairId });
 
     try {
-      // Update usage count atomically
+      // Use the secure RPC function that handles authentication and atomic updates
+      // The function validates the user ID via JWT context and ensures RLS compliance
       const { data, error } = await supabase
         .rpc('increment_word_pair_usage', {
-          word_pair_id: wordPairId,
-          user_id: userId
+          p_lexicon_id: wordPairId
         });
 
       if (error) {
-        console.error('❌ Failed to increment usage:', error);
+        console.error('❌ RPC function failed to increment usage:', error);
         throw new Error(`Failed to increment usage: ${error.message}`);
       }
 
-      console.log('✅ Word pair usage incremented');
+      if (!data || data.length === 0) {
+        throw new Error('Word pair not found or access denied');
+      }
+
+      const updatedWordPair = data[0];
+      console.log('✅ Word pair usage incremented successfully:', updatedWordPair);
       
-      // Fetch the updated word pair
-      return await this.getWordPairById(userId, wordPairId);
+      return updatedWordPair;
 
     } catch (error) {
       console.error('❌ Error incrementing word pair usage:', error);

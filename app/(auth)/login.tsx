@@ -8,8 +8,7 @@ import {
   TouchableOpacity, 
   ActivityIndicator, 
   TouchableWithoutFeedback,
-  Keyboard,
-  Platform 
+  Keyboard 
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useRouter } from 'expo-router';
@@ -19,8 +18,8 @@ import { makeRedirectUri } from 'expo-auth-session';
 
 /**
  * LoginScreen Component
- * Provides user authentication through email/password and social providers
- * Supports Google, Apple, and Facebook sign-in options
+ * Provides user authentication through email/password and Google OAuth
+ * Simplified authentication flow with only Google and Email options
  * Implements keyboard dismissal functionality for better UX
  */
 export default function LoginScreen() {
@@ -28,7 +27,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [socialLoading, setSocialLoading] = useState<string | null>(null);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const router = useRouter();
 
   /**
@@ -63,10 +62,11 @@ export default function LoginScreen() {
   /**
    * Handles Google OAuth authentication using Supabase Auth
    * Uses expo-web-browser for secure OAuth flow with deep linking
+   * Full-width button design with Google branding
    */
   async function signInWithGoogle() {
     console.log('🔵 Initiating Google OAuth sign-in');
-    setSocialLoading('google');
+    setGoogleLoading(true);
     
     try {
       const redirectUrl = makeRedirectUri({
@@ -105,101 +105,7 @@ export default function LoginScreen() {
       console.error('❌ Unexpected Google OAuth error:', error);
       Alert.alert('Error', 'Failed to sign in with Google. Please try again.');
     } finally {
-      setSocialLoading(null);
-    }
-  }
-
-  /**
-   * Handles Apple OAuth authentication using Supabase Auth
-   * Available on iOS and web platforms
-   */
-  async function signInWithApple() {
-    console.log('🍎 Initiating Apple OAuth sign-in');
-    setSocialLoading('apple');
-    
-    try {
-      const redirectUrl = makeRedirectUri({
-        scheme: 'archie',
-        path: 'auth/callback',
-      });
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'apple',
-        options: {
-          redirectTo: redirectUrl,
-          skipBrowserRedirect: true,
-        },
-      });
-
-      if (error) {
-        console.error('❌ Apple OAuth error:', error.message);
-        Alert.alert('Apple Sign In Error', error.message);
-        return;
-      }
-
-      if (data.url) {
-        console.log('🌐 Opening Apple OAuth URL in browser');
-        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
-        
-        if (result.type === 'success') {
-          console.log('✅ Apple OAuth completed successfully');
-          // The callback will be handled by the deep link
-        } else {
-          console.log('❌ Apple OAuth was cancelled or failed');
-        }
-      }
-    } catch (error) {
-      console.error('❌ Unexpected Apple OAuth error:', error);
-      Alert.alert('Error', 'Failed to sign in with Apple. Please try again.');
-    } finally {
-      setSocialLoading(null);
-    }
-  }
-
-  /**
-   * Handles Facebook OAuth authentication using Supabase Auth
-   * Uses expo-web-browser for secure OAuth flow
-   */
-  async function signInWithFacebook() {
-    console.log('📘 Initiating Facebook OAuth sign-in');
-    setSocialLoading('facebook');
-    
-    try {
-      const redirectUrl = makeRedirectUri({
-        scheme: 'archie',
-        path: 'auth/callback',
-      });
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'facebook',
-        options: {
-          redirectTo: redirectUrl,
-          skipBrowserRedirect: true,
-        },
-      });
-
-      if (error) {
-        console.error('❌ Facebook OAuth error:', error.message);
-        Alert.alert('Facebook Sign In Error', error.message);
-        return;
-      }
-
-      if (data.url) {
-        console.log('🌐 Opening Facebook OAuth URL in browser');
-        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
-        
-        if (result.type === 'success') {
-          console.log('✅ Facebook OAuth completed successfully');
-          // The callback will be handled by the deep link
-        } else {
-          console.log('❌ Facebook OAuth was cancelled or failed');
-        }
-      }
-    } catch (error) {
-      console.error('❌ Unexpected Facebook OAuth error:', error);
-      Alert.alert('Error', 'Failed to sign in with Facebook. Please try again.');
-    } finally {
-      setSocialLoading(null);
+      setGoogleLoading(false);
     }
   }
 
@@ -228,7 +134,7 @@ export default function LoginScreen() {
             onChangeText={setEmail}
             autoCapitalize="none"
             keyboardType="email-address"
-            editable={!loading && !socialLoading}
+            editable={!loading && !googleLoading}
           />
           <TextInput
             style={styles.input}
@@ -237,7 +143,7 @@ export default function LoginScreen() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry
-            editable={!loading && !socialLoading}
+            editable={!loading && !googleLoading}
           />
         </View>
 
@@ -246,7 +152,7 @@ export default function LoginScreen() {
           <TouchableOpacity 
             style={styles.button} 
             onPress={signInWithEmail} 
-            disabled={loading || socialLoading !== null}
+            disabled={loading || googleLoading}
           >
             {loading ? (
               <ActivityIndicator color="#121820" />
@@ -258,59 +164,34 @@ export default function LoginScreen() {
           {/* Social Sign In Divider */}
           <View style={styles.dividerContainer}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>Or continue with</Text>
+            <Text style={styles.dividerText}>Or</Text>
             <View style={styles.dividerLine} />
           </View>
 
-          {/* Social Sign In Buttons */}
-          <View style={styles.socialButtonsContainer}>
-            {/* Google Sign In */}
-            <TouchableOpacity 
-              style={[styles.socialButton, styles.googleButton]} 
-              onPress={signInWithGoogle}
-              disabled={loading || socialLoading !== null}
-            >
-              {socialLoading === 'google' ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Text style={styles.socialButtonText}>Google</Text>
-              )}
-            </TouchableOpacity>
-
-            {/* Apple Sign In - Only show on iOS */}
-            {Platform.OS === 'ios' && (
-              <TouchableOpacity 
-                style={[styles.socialButton, styles.appleButton]} 
-                onPress={signInWithApple}
-                disabled={loading || socialLoading !== null}
-              >
-                {socialLoading === 'apple' ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Text style={styles.socialButtonText}>Apple</Text>
-                )}
-              </TouchableOpacity>
+          {/* Google Sign In Button - Full Width with Icon */}
+          <TouchableOpacity 
+            style={styles.googleButton} 
+            onPress={signInWithGoogle}
+            disabled={loading || googleLoading}
+          >
+            {googleLoading ? (
+              <ActivityIndicator color="#374151" size="small" />
+            ) : (
+              <View style={styles.googleButtonContent}>
+                {/* Google Icon - Using G text as placeholder for actual Google icon */}
+                <View style={styles.googleIcon}>
+                  <Text style={styles.googleIconText}>G</Text>
+                </View>
+                <Text style={styles.googleButtonText}>Continue with Google</Text>
+              </View>
             )}
-
-            {/* Facebook Sign In */}
-            <TouchableOpacity 
-              style={[styles.socialButton, styles.facebookButton]} 
-              onPress={signInWithFacebook}
-              disabled={loading || socialLoading !== null}
-            >
-              {socialLoading === 'facebook' ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Text style={styles.socialButtonText}>Facebook</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
 
           {/* Navigate to Sign Up */}
           <TouchableOpacity 
             style={[styles.button, styles.secondaryButton]} 
             onPress={() => router.push('/(auth)/signup' as any)} 
-            disabled={loading || socialLoading !== null}
+            disabled={loading || googleLoading}
           >
             <Text style={[styles.buttonText, styles.secondaryButtonText]}>Create Account</Text>
           </TouchableOpacity>
@@ -396,32 +277,49 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginHorizontal: 16,
   },
-  socialButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  socialButton: {
-    flex: 1,
+  // Google Button Styles - Full width with white background and icon
+  googleButton: {
+    backgroundColor: '#FFFFFF', // White background for Google branding
+    borderWidth: 1,
+    borderColor: '#DADCE0', // Light gray border similar to Google's design
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 44,
+    minHeight: 50,
+    // Subtle shadow for depth
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  socialButtonText: {
+  googleButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#4285F4', // Google blue
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  googleIconText: {
     color: '#FFFFFF',
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'Inter-Bold',
     fontSize: 14,
   },
-  googleButton: {
-    backgroundColor: '#4285F4', // Google brand color
-  },
-  appleButton: {
-    backgroundColor: '#000000', // Apple brand color
-  },
-  facebookButton: {
-    backgroundColor: '#1877F2', // Facebook brand color
+  googleButtonText: {
+    color: '#374151', // Dark gray text on white background
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
   },
 }); 

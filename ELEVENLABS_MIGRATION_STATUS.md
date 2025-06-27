@@ -16,7 +16,7 @@
 ### 2. Backend Refactor
 - [x] **Speech Router (`speech.py`)**: Complete ElevenLabs STT integration
   - Replaced Google Cloud Speech client with ElevenLabs client
-  - Updated transcription logic for `eleven_multilingual_v1` model
+  - Updated transcription logic for `scribe_v1` model
   - Enhanced error handling for ElevenLabs-specific responses
   - Maintained same API endpoints for frontend compatibility
   - Added 60-second audio limit validation
@@ -55,8 +55,8 @@
 ## 🎯 Migration Summary
 
 **What Changed:**
-- **STT Provider:** Google Cloud Speech → ElevenLabs (`eleven_multilingual_v1`)
-- **Added TTS:** New ElevenLabs TTS support for Phase 2 (`eleven_multilingual_v2`)
+- **STT Provider:** Google Cloud Speech → ElevenLabs (`scribe_v1`)
+- **Added TTS:** New ElevenLabs TTS support for Phase 2 (`scribe_v1`)
 - **Simplified Setup:** Removed Google Cloud service account complexity
 - **Enhanced Limits:** 60-second audio limit (ElevenLabs constraint)
 - **Better Error Handling:** ElevenLabs-specific error messages
@@ -78,7 +78,7 @@
 
 ### Phase 2: AI Follow-up TTS (Ready for Implementation)
 - Frontend can call `/api/speech/synthesize` with AI-generated text
-- ElevenLabs generates audio with `eleven_multilingual_v2`
+- ElevenLabs generates audio with `scribe_v1`
 - Returns base64 MP3 for `expo-av` playback
 
 ---

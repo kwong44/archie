@@ -1,28 +1,105 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Calendar, TrendingUp, Clock, Award } from 'lucide-react-native';
+import { useAuth } from '@/context/AuthContext';
+import { DashboardService } from '@/services/dashboardService';
+import { InsightsService } from '@/services/insightsService';
+import { logger } from '@/lib/logger';
+import type { DashboardMetrics, UserAchievement } from '@/services/dashboardService';
+import type { UserInsight } from '@/services/insightsService';
 
 const { width } = Dimensions.get('window');
 
 export default function DashboardScreen() {
-  // Mock data - in real app, this would come from your analytics
-  const weeklyData = [
-    { day: 'Mon', sessions: 2, duration: 15 },
-    { day: 'Tue', sessions: 1, duration: 8 },
-    { day: 'Wed', sessions: 3, duration: 22 },
-    { day: 'Thu', sessions: 0, duration: 0 },
-    { day: 'Fri', sessions: 2, duration: 18 },
-    { day: 'Sat', sessions: 1, duration: 12 },
-    { day: 'Sun', sessions: 2, duration: 16 },
-  ];
+  const { session } = useAuth();
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [achievements, setAchievements] = useState<UserAchievement[]>([]);
+  const [insights, setInsights] = useState<UserInsight[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const totalSessions = weeklyData.reduce((sum, day) => sum + day.sessions, 0);
-  const totalDuration = weeklyData.reduce((sum, day) => sum + day.duration, 0);
-  const streak = 5; // Current streak in days
-  const reframingRate = 78; // Percentage of negative words reframed
+  /**
+   * Fetches dashboard data from Supabase when component mounts or user changes
+   * Loads both metrics and achievements in parallel for better performance
+   */
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      if (!session?.user?.id) {
+        logger.warn('No authenticated user found for dashboard');
+        setLoading(false);
+        return;
+      }
 
-  const maxSessions = Math.max(...weeklyData.map(d => d.sessions));
+      try {
+        logger.info('Fetching dashboard data for user', { userId: session.user.id });
+        setLoading(true);
+        setError(null);
+
+        // Fetch metrics, achievements, and insights in parallel
+        const [dashboardMetrics, userAchievements, userInsights] = await Promise.all([
+          DashboardService.getDashboardMetrics(session.user.id),
+          DashboardService.getUserAchievements(session.user.id, 5),
+          InsightsService.generateUserInsights(session.user.id, 3)
+        ]);
+
+        setMetrics(dashboardMetrics);
+        setAchievements(userAchievements);
+        setInsights(userInsights);
+        
+        logger.info('Dashboard data loaded successfully', { 
+          userId: session.user.id,
+          hasMetrics: !!dashboardMetrics,
+          achievementCount: userAchievements.length,
+          insightsCount: userInsights.length
+        });
+
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to load dashboard data';
+        logger.error('Error loading dashboard data', { 
+          userId: session.user.id,
+          error: errorMessage
+        });
+        setError(errorMessage);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [session?.user?.id]);
+
+  // Show loading state while fetching data
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FFC300" />
+          <Text style={styles.loadingText}>Loading your journey...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Show error state if data fetch failed
+  if (error || !metrics) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>
+            {error || 'Unable to load dashboard data'}
+          </Text>
+          <Text style={styles.errorSubtext}>
+            Please check your connection and try again
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Calculate derived values from real data
+  const { dayStreak, weeklyDuration, reframingRate, weeklyData } = metrics;
+  const maxSessions = Math.max(...weeklyData.map(d => d.sessions), 1); // Ensure min value of 1 to prevent division by zero
 
   return (
     <SafeAreaView style={styles.container}>
@@ -38,7 +115,7 @@ export default function DashboardScreen() {
             <View style={styles.metricIconContainer}>
               <TrendingUp color="#FFC300" size={24} strokeWidth={2} />
             </View>
-            <Text style={styles.metricNumber}>{streak}</Text>
+            <Text style={styles.metricNumber}>{dayStreak}</Text>
             <Text style={styles.metricLabel}>Day Streak</Text>
           </View>
           
@@ -46,7 +123,7 @@ export default function DashboardScreen() {
             <View style={styles.metricIconContainer}>
               <Clock color="#4A90E2" size={24} strokeWidth={2} />
             </View>
-            <Text style={styles.metricNumber}>{totalDuration}m</Text>
+            <Text style={styles.metricNumber}>{weeklyDuration}m</Text>
             <Text style={styles.metricLabel}>This Week</Text>
           </View>
           
@@ -85,29 +162,32 @@ export default function DashboardScreen() {
 
         {/* Insights */}
         <View style={styles.insightsContainer}>
-          <Text style={styles.insightsTitle}>Recent Insights</Text>
+          <Text style={styles.insightsTitle}>Personal Insights</Text>
           
-          <View style={styles.insightCard}>
-            <View style={styles.insightHeader}>
-              <Calendar color="#4A90E2" size={20} strokeWidth={2} />
-              <Text style={styles.insightDate}>Today</Text>
+          {insights.length > 0 ? (
+            insights.map((insight) => (
+              <View key={insight.id} style={styles.insightCard}>
+                <View style={styles.insightHeader}>
+                  <Calendar color="#4A90E2" size={20} strokeWidth={2} />
+                  <Text style={styles.insightDate}>{insight.title}</Text>
+                </View>
+                <Text style={styles.insightText}>
+                  {insight.description}
+                </Text>
+              </View>
+            ))
+          ) : (
+            // Show fallback insight when none are generated
+            <View style={styles.insightCard}>
+              <View style={styles.insightHeader}>
+                <Calendar color="#4A90E2" size={20} strokeWidth={2} />
+                <Text style={styles.insightDate}>Your Journey</Text>
+              </View>
+              <Text style={styles.insightText}>
+                Every moment of awareness is a step toward transformation. Start journaling to unlock personalized insights about your growth patterns.
+              </Text>
             </View>
-            <Text style={styles.insightText}>
-              You've been consistently reframing "overwhelmed" to "full of opportunities" - 
-              this shift is becoming natural for you.
-            </Text>
-          </View>
-
-          <View style={styles.insightCard}>
-            <View style={styles.insightHeader}>
-              <TrendingUp color="#10B981" size={20} strokeWidth={2} />
-              <Text style={styles.insightDate}>This Week</Text>
-            </View>
-            <Text style={styles.insightText}>
-              Your evening sessions tend to be longer and more reflective. 
-              Consider this your prime time for deeper exploration.
-            </Text>
-          </View>
+          )}
         </View>
 
         {/* Achievements */}
@@ -115,25 +195,42 @@ export default function DashboardScreen() {
           <Text style={styles.achievementsTitle}>Recent Achievements</Text>
           
           <View style={styles.achievementsList}>
-            <View style={styles.achievementItem}>
-              <View style={styles.achievementBadge}>
-                <Award color="#FFC300" size={16} strokeWidth={2} />
-              </View>
-              <View style={styles.achievementContent}>
-                <Text style={styles.achievementName}>Mindful Week</Text>
-                <Text style={styles.achievementDescription}>Completed 7 days of journaling</Text>
-              </View>
-            </View>
+            {achievements.length > 0 ? (
+              achievements.map((achievement) => (
+                <View key={achievement.id} style={styles.achievementItem}>
+                  <View style={styles.achievementBadge}>
+                    <Award color="#FFC300" size={16} strokeWidth={2} />
+                  </View>
+                  <View style={styles.achievementContent}>
+                    <Text style={styles.achievementName}>{achievement.achievement_name}</Text>
+                    <Text style={styles.achievementDescription}>{achievement.achievement_description}</Text>
+                  </View>
+                </View>
+              ))
+            ) : (
+              // Show placeholder achievements when none exist
+              <>
+                <View style={styles.achievementItem}>
+                  <View style={styles.achievementBadge}>
+                    <Award color="#FFC300" size={16} strokeWidth={2} />
+                  </View>
+                  <View style={styles.achievementContent}>
+                    <Text style={styles.achievementName}>First Steps</Text>
+                    <Text style={styles.achievementDescription}>Complete your first journal session to unlock achievements</Text>
+                  </View>
+                </View>
 
-            <View style={styles.achievementItem}>
-              <View style={styles.achievementBadge}>
-                <TrendingUp color="#10B981" size={16} strokeWidth={2} />
-              </View>
-              <View style={styles.achievementContent}>
-                <Text style={styles.achievementName}>Transformation Master</Text>
-                <Text style={styles.achievementDescription}>Reframed 50+ negative thoughts</Text>
-              </View>
-            </View>
+                <View style={styles.achievementItem}>
+                  <View style={styles.achievementBadge}>
+                    <TrendingUp color="#10B981" size={16} strokeWidth={2} />
+                  </View>
+                  <View style={styles.achievementContent}>
+                    <Text style={styles.achievementName}>Consistency Builder</Text>
+                    <Text style={styles.achievementDescription}>Keep journaling to build your streak and earn rewards</Text>
+                  </View>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -148,6 +245,40 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
+  },
+  // Loading state styles
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#9CA3AF',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  // Error state styles
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 18,
+    fontFamily: 'Inter-SemiBold',
+    color: '#E53E3E',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  errorSubtext: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#9CA3AF',
+    textAlign: 'center',
   },
   header: {
     marginBottom: 30,

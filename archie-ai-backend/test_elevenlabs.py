@@ -44,7 +44,7 @@ def test_tts_functionality():
         audio_generator = client.generate(
             text=test_text,
             voice="JBFqnCBsd6RMkjVDRZzb",  # Default voice
-            model="eleven_multilingual_v2",
+            model="scribe_v1",
             output_format="mp3_44100_128"
         )
         

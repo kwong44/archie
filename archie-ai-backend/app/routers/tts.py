@@ -91,7 +91,7 @@ async def synthesize_text(
     try:
         logger.info("Starting ElevenLabs TTS synthesis", extra={
             'user_id': user_id,
-            'model': 'eleven_multilingual_v2',
+            'model': 'scribe_v1',
             'voice_id': request.voice_id
         })
         
@@ -99,7 +99,7 @@ async def synthesize_text(
         audio_generator = eleven.generate(
             text=request.text,
             voice=request.voice_id,  # Voice ID or name
-            model="eleven_multilingual_v2",  # Updated model parameter name
+            model="scribe_v1",  # Updated model parameter name
             output_format="mp3_44100_128"
         )
         

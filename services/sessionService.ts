@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase';
 import { createContextLogger } from '@/lib/logger';
 import { LexiconService } from './lexiconService';
+import { AchievementsService } from './achievementsService';
+import type { AchievementAwardResult } from './achievementsService';
 
 // Create context-specific logger for session operations
 const sessionLogger = createContextLogger('SessionService');
@@ -39,6 +41,11 @@ export interface CreateSessionData {
   mood_after?: string;
   session_duration_seconds?: number;
   transformations_applied: TransformationApplied[];
+}
+
+export interface SessionCreationResult {
+  session: JournalSession;
+  newAchievements: AchievementAwardResult[];
 }
 
 /**
@@ -103,10 +110,78 @@ export class SessionService {
         this.updateLexiconUsageCounts(userId, sessionData.transformations_applied)
       ]);
 
+      // Process achievements after successful session completion
+      // This is non-blocking to prevent achievements from affecting session creation
+      setImmediate(async () => {
+        try {
+          const newAchievements = await AchievementsService.processSessionAchievements(userId);
+          if (newAchievements.length > 0) {
+            sessionLogger.info('New achievements awarded after session', {
+              userId,
+              sessionId: session.id,
+              achievements: newAchievements.map(a => a.achievementName)
+            });
+          }
+        } catch (error) {
+          sessionLogger.warn('Achievement processing failed but session created successfully', {
+            userId,
+            sessionId: session.id,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      });
+
       return session;
 
     } catch (error) {
       sessionLogger.error('Error creating journal session', {
+        userId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Creates a session and immediately processes achievements for UI notifications
+   * Unlike createSession, this method waits for achievements to be processed
+   * Use this when you need to show achievement notifications immediately
+   * 
+   * @param userId - The authenticated user's ID
+   * @param sessionData - The session data to save
+   * @returns Promise resolving to session and new achievements
+   */
+  static async createSessionWithAchievements(
+    userId: string,
+    sessionData: CreateSessionData
+  ): Promise<SessionCreationResult> {
+    sessionLogger.info('Creating session with immediate achievement processing', {
+      userId,
+      transcriptLength: sessionData.original_transcript.length
+    });
+
+    try {
+      // Create the session using the standard method
+      const session = await this.createSession(userId, sessionData);
+      
+      // Process achievements synchronously for immediate UI feedback
+      const newAchievements = await AchievementsService.processSessionAchievements(userId);
+      
+      if (newAchievements.length > 0) {
+        sessionLogger.info('Achievements processed for immediate UI display', {
+          userId,
+          sessionId: session.id,
+          achievements: newAchievements.map(a => a.achievementName)
+        });
+      }
+
+      return {
+        session,
+        newAchievements
+      };
+
+    } catch (error) {
+      sessionLogger.error('Error creating session with achievements', {
         userId,
         error: error instanceof Error ? error.message : 'Unknown error'
       });

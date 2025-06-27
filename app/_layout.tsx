@@ -6,6 +6,8 @@ import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@e
 import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { createContextLogger } from '../lib/logger';
+import { SubscriptionService } from '@/services/subscriptionService';
+import Constants from 'expo-constants';
 
 // Create a context-specific logger for navigation workflows
 const navLogger = createContextLogger('RootLayout');
@@ -66,6 +68,7 @@ function RootLayoutNav() {
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
       <Stack.Screen name="reframe" options={{ headerShown: false }} />
+      <Stack.Screen name="paywall" options={{ headerShown: false }} />
       <Stack.Screen name="+not-found" />
     </Stack>
   );
@@ -80,6 +83,32 @@ export default function RootLayout() {
     'Inter-SemiBold': Inter_600SemiBold,
     'Inter-Bold': Inter_700Bold,
   });
+
+  /**
+   * Initialize RevenueCat when the app starts
+   * Uses the API key from environment variables
+   */
+  useEffect(() => {
+    const initializeRevenueCat = async () => {
+      try {
+        const revenueCatApiKey = Constants.expoConfig?.extra?.revenueCatApiKey;
+        
+        if (revenueCatApiKey) {
+          navLogger.info('Initializing RevenueCat');
+          await SubscriptionService.initialize(revenueCatApiKey);
+          navLogger.info('RevenueCat initialized successfully');
+        } else {
+          navLogger.warn('RevenueCat API key not found in environment variables');
+        }
+      } catch (error) {
+        navLogger.error('Failed to initialize RevenueCat', { 
+          error: error instanceof Error ? error.message : 'Unknown error' 
+        });
+      }
+    };
+
+    initializeRevenueCat();
+  }, []);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { 
   User, 
   Bell, 
@@ -15,6 +16,38 @@ import {
 } from 'lucide-react-native';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { logger } from '@/lib/logger';
+import { SubscriptionService } from '@/services/subscriptionService';
+
+/**
+ * Interface for app info data from Supabase
+ */
+interface AppInfoData {
+  totalSessions: number;
+  totalTransformations: number;
+  memberSince: string;
+  userEmail: string;
+}
+
+/**
+ * Interface for settings items with optional properties
+ */
+interface SettingsItem {
+  icon: React.ComponentType<any>;
+  label: string;
+  description: string;
+  isSignOut?: boolean;
+  onPress?: () => void;
+  disabled?: boolean;
+}
+
+/**
+ * Interface for settings sections
+ */
+interface SettingsSection {
+  title: string;
+  items: SettingsItem[];
+}
 
 /**
  * GuideScreen Component
@@ -23,7 +56,137 @@ import { supabase } from '@/lib/supabase';
  */
 export default function GuideScreen() {
   const { session } = useAuth();
+  const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [appInfo, setAppInfo] = useState<AppInfoData | null>(null);
+  const [loadingAppInfo, setLoadingAppInfo] = useState(true);
+  const [hasPremium, setHasPremium] = useState(false);
+  const [checkingPremium, setCheckingPremium] = useState(true);
+
+  /**
+   * Fetches dynamic app info data from Supabase
+   * Includes session count, transformation count, and member since date
+   */
+  useEffect(() => {
+    const fetchAppInfo = async () => {
+      if (!session?.user?.id) {
+        logger.warn('No authenticated user found for app info');
+        setLoadingAppInfo(false);
+        return;
+      }
+
+      try {
+        logger.info('Fetching app info data for user', { userId: session.user.id });
+
+        // Fetch data in parallel for better performance
+        const [
+          { data: sessions, error: sessionsError },
+          { data: transformations, error: transformationsError },
+          { data: userProfile, error: profileError }
+        ] = await Promise.all([
+          supabase
+            .from('journal_sessions')
+            .select('id')
+            .eq('user_id', session.user.id),
+          supabase
+            .from('transformation_usage')
+            .select('id')
+            .eq('user_id', session.user.id),
+          supabase
+            .from('user_profiles')
+            .select('created_at')
+            .eq('user_id', session.user.id)
+            .single()
+        ]);
+
+        if (sessionsError || transformationsError || profileError) {
+          logger.error('Failed to fetch app info data', {
+            userId: session.user.id,
+            sessionsError,
+            transformationsError,
+            profileError
+          });
+          setLoadingAppInfo(false);
+          return;
+        }
+
+        // Calculate member since date
+        const memberSinceDate = userProfile?.created_at 
+          ? new Date(userProfile.created_at)
+          : new Date(session.user.created_at || Date.now());
+
+        const memberSince = memberSinceDate.toLocaleDateString('en-US', {
+          month: 'short',
+          year: 'numeric'
+        });
+
+        const appInfoData: AppInfoData = {
+          totalSessions: sessions?.length || 0,
+          totalTransformations: transformations?.length || 0,
+          memberSince,
+          userEmail: session.user.email || 'Unknown'
+        };
+
+        setAppInfo(appInfoData);
+        logger.info('App info data loaded successfully', {
+          userId: session.user.id,
+          totalSessions: appInfoData.totalSessions,
+          totalTransformations: appInfoData.totalTransformations,
+          memberSince: appInfoData.memberSince
+        });
+
+      } catch (error) {
+        logger.error('Error fetching app info data', {
+          userId: session.user.id,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      } finally {
+        setLoadingAppInfo(false);
+      }
+    };
+
+    fetchAppInfo();
+  }, [session?.user?.id]);
+
+  /**
+   * Checks the user's premium subscription status
+   * Updates the premium state for conditional UI rendering
+   */
+  useEffect(() => {
+    const checkPremiumStatus = async () => {
+      if (!session?.user?.id) {
+        setCheckingPremium(false);
+        return;
+      }
+
+      try {
+        logger.info('Checking premium subscription status', { userId: session.user.id });
+
+        // Set the user ID in RevenueCat for proper linking
+        await SubscriptionService.setUserID(session.user.id);
+        
+        // Check if user has premium access
+        const premiumStatus = await SubscriptionService.hasPremiumAccess();
+        setHasPremium(premiumStatus);
+
+        logger.info('Premium status checked', { 
+          userId: session.user.id, 
+          hasPremium: premiumStatus 
+        });
+
+      } catch (error) {
+        logger.error('Failed to check premium status', {
+          userId: session.user.id,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+        setHasPremium(false); // Default to no premium on error
+      } finally {
+        setCheckingPremium(false);
+      }
+    };
+
+    checkPremiumStatus();
+  }, [session?.user?.id]);
 
   /**
    * Handles user sign-out with confirmation dialog
@@ -45,19 +208,21 @@ export default function GuideScreen() {
             setIsSigningOut(true);
             
             try {
-              console.log('🔐 Signing out user');
+              logger.info('User initiated sign out');
               
               const { error } = await supabase.auth.signOut();
               
               if (error) {
-                console.error('❌ Sign-out error:', error);
+                logger.error('Sign-out error', { error: error.message });
                 Alert.alert('Sign Out Error', error.message);
               } else {
-                console.log('✅ User signed out successfully');
+                logger.info('User signed out successfully');
                 // Navigation will be handled automatically by AuthContext
               }
             } catch (error) {
-              console.error('❌ Unexpected sign-out error:', error);
+              logger.error('Unexpected sign-out error', { 
+                error: error instanceof Error ? error.message : 'Unknown error' 
+              });
               Alert.alert('Error', 'An unexpected error occurred. Please try again.');
             } finally {
               setIsSigningOut(false);
@@ -68,7 +233,7 @@ export default function GuideScreen() {
     );
   };
 
-  const settingsSections = [
+  const settingsSections: SettingsSection[] = [
     {
       title: 'Personal',
       items: [
@@ -122,23 +287,48 @@ export default function GuideScreen() {
           )}
         </View>
 
-        {/* Premium Banner */}
-        <View style={styles.premiumBanner}>
-          <View style={styles.premiumContent}>
-            <View style={styles.premiumIcon}>
-              <Sparkles color="#121820" size={24} strokeWidth={2} />
+        {/* Premium Banner - Only show for non-premium users */}
+        {!hasPremium && !checkingPremium && (
+          <View style={styles.premiumBanner}>
+            <View style={styles.premiumContent}>
+              <View style={styles.premiumIcon}>
+                <Sparkles color="#121820" size={24} strokeWidth={2} />
+              </View>
+              <View style={styles.premiumText}>
+                <Text style={styles.premiumTitle}>Unlock Premium</Text>
+                <Text style={styles.premiumDescription}>
+                  Advanced AI insights, unlimited recordings, and personalized growth plans
+                </Text>
+              </View>
             </View>
-            <View style={styles.premiumText}>
-              <Text style={styles.premiumTitle}>Unlock Premium</Text>
-              <Text style={styles.premiumDescription}>
-                Advanced AI insights, unlimited recordings, and personalized growth plans
-              </Text>
+            <TouchableOpacity 
+              style={styles.premiumButton}
+              onPress={() => {
+                logger.info('User tapped upgrade button');
+                router.push('/paywall' as any);
+              }}
+            >
+              <Text style={styles.premiumButtonText}>Upgrade</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Premium Status - Show for premium users */}
+        {hasPremium && (
+          <View style={styles.premiumStatusBanner}>
+            <View style={styles.premiumContent}>
+              <View style={styles.premiumActiveIcon}>
+                <Sparkles color="#10B981" size={24} strokeWidth={2} />
+              </View>
+              <View style={styles.premiumText}>
+                <Text style={styles.premiumActiveTitle}>Premium Active</Text>
+                <Text style={styles.premiumActiveDescription}>
+                  You have full access to all premium features
+                </Text>
+              </View>
             </View>
           </View>
-          <TouchableOpacity style={styles.premiumButton}>
-            <Text style={styles.premiumButtonText}>Upgrade</Text>
-          </TouchableOpacity>
-        </View>
+        )}
 
         {/* Settings Sections */}
         {settingsSections.map((section, sectionIndex) => (
@@ -150,8 +340,8 @@ export default function GuideScreen() {
                   key={itemIndex} 
                   style={[
                     styles.settingItem,
-                    item.isSignOut && styles.signOutItem,
-                    item.disabled && styles.disabledItem
+                    ('isSignOut' in item && item.isSignOut) && styles.signOutItem,
+                    ('disabled' in item && item.disabled) && styles.disabledItem
                   ]}
                   onPress={item.onPress}
                   disabled={item.disabled}
@@ -193,24 +383,33 @@ export default function GuideScreen() {
         {/* App Info */}
         <View style={styles.appInfo}>
           <Text style={styles.appInfoTitle}>About</Text>
-          <View style={styles.appInfoGrid}>
-            <View style={styles.appInfoItem}>
-              <Text style={styles.appInfoLabel}>Version</Text>
-              <Text style={styles.appInfoValue}>1.0.0</Text>
+          {loadingAppInfo ? (
+            <View style={styles.appInfoGrid}>
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator color="#FFC300" size="small" />
+                <Text style={styles.loadingText}>Loading app data...</Text>
+              </View>
             </View>
-            <View style={styles.appInfoItem}>
-              <Text style={styles.appInfoLabel}>Sessions</Text>
-              <Text style={styles.appInfoValue}>127</Text>
+          ) : (
+            <View style={styles.appInfoGrid}>
+              <View style={styles.appInfoItem}>
+                <Text style={styles.appInfoLabel}>Version</Text>
+                <Text style={styles.appInfoValue}>1.0.0</Text>
+              </View>
+              <View style={styles.appInfoItem}>
+                <Text style={styles.appInfoLabel}>Sessions</Text>
+                <Text style={styles.appInfoValue}>{appInfo?.totalSessions ?? 0}</Text>
+              </View>
+              <View style={styles.appInfoItem}>
+                <Text style={styles.appInfoLabel}>Words Reframed</Text>
+                <Text style={styles.appInfoValue}>{appInfo?.totalTransformations ?? 0}</Text>
+              </View>
+              <View style={[styles.appInfoItem, styles.lastAppInfoItem]}>
+                <Text style={styles.appInfoLabel}>Member Since</Text>
+                <Text style={styles.appInfoValue}>{appInfo?.memberSince ?? 'Recently'}</Text>
+              </View>
             </View>
-            <View style={styles.appInfoItem}>
-              <Text style={styles.appInfoLabel}>Words Reframed</Text>
-              <Text style={styles.appInfoValue}>1,248</Text>
-            </View>
-            <View style={styles.appInfoItem}>
-              <Text style={styles.appInfoLabel}>Member Since</Text>
-              <Text style={styles.appInfoValue}>Jan 2025</Text>
-            </View>
-          </View>
+          )}
         </View>
 
         {/* Philosophy */}
@@ -433,5 +632,51 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     color: '#FFC300', // Primary accent color
     textAlign: 'right',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
+  loadingText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#9CA3AF', // Secondary text color
+    marginLeft: 10,
+  },
+  lastAppInfoItem: {
+    borderBottomWidth: 0, // Remove border for last item
+  },
+  premiumStatusBanner: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)', // Success color with opacity
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  premiumActiveIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  premiumActiveTitle: {
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    color: '#10B981', // Success color
+    marginBottom: 4,
+  },
+  premiumActiveDescription: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#F5F5F0', // Primary text color
+    opacity: 0.8,
   },
 });

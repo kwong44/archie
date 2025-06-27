@@ -204,8 +204,8 @@ async def generate(request: Request, token: HTTPAuthorizationCredentials = Depen
 
 *   **AI Services:**
     *   **ElevenLabs:** Primary provider for Speech-to-Text (STT) and Text-to-Speech (TTS) capabilities
-        *   **STT Model:** `eleven_multilingual_v1` for batch audio transcription
-        *   **TTS Model:** `eleven_multilingual_v2` for AI follow-up voice synthesis
+        *   **STT Model:** `scribe_v1` for batch audio transcription
+        *   **TTS Model:** `scribe_v1` for AI follow-up voice synthesis
         *   **Rule:** All ElevenLabs API calls **MUST** be routed through the Python backend for security
         *   **Authentication:** API key stored as environment variable `ELEVENLABS_API_KEY`
     *   **Google Gemini API:** For AI-powered text processing and summarization

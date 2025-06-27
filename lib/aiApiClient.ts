@@ -77,13 +77,27 @@ export interface AISummaryResponse {
 }
 
 /**
+ * Text-to-Speech API Request Types (Phase 2)
+ */
+export interface TTSRequest {
+  text: string;
+  voice_id?: string;
+}
+
+export interface TTSResponse {
+  audio_base64: string;
+  processing_time_ms: number;
+  voice_id: string;
+}
+
+/**
  * AI API Client
  * Provides methods for calling the Python AI backend
  */
 export const aiApiClient = {
   
   /**
-   * Convert audio file to text using Google Cloud Speech API
+   * Convert audio file to text using ElevenLabs API
    * Implements Task 3.4: Speech-to-Text integration
    * 
    * @param request SpeechToTextRequest with audio URI and options
@@ -107,17 +121,39 @@ export const aiApiClient = {
       // Create FormData for file upload
       const formData = new FormData();
       
-      // Read the audio file and create a blob
-      const response = await fetch(request.audioUri);
-      const audioBlob = await response.blob();
+      // For React Native/Expo, we need to use the URI directly for FormData
+      // The fetch() approach doesn't work with expo-av file URIs
+      const audioUri = request.audioUri;
       
-      formData.append('audio_file', audioBlob, 'recording.wav');
+      // Determine file extension and MIME type from the URI
+      const fileName = audioUri.split('/').pop() || 'recording.m4a';
+      const fileExtension = fileName.split('.').pop()?.toLowerCase();
+      
+      // Map file extensions to MIME types
+      const mimeTypeMap: { [key: string]: string } = {
+        'm4a': 'audio/m4a',
+        'wav': 'audio/wav',
+        'mp3': 'audio/mpeg',
+        'aac': 'audio/aac'
+      };
+      
+      const mimeType = mimeTypeMap[fileExtension || 'm4a'] || 'audio/m4a';
+      
+      // For React Native, we can pass the file URI directly to FormData
+      // This works with expo-av generated file URIs
+      formData.append('audio_file', {
+        uri: audioUri,
+        type: mimeType,
+        name: fileName,
+      } as any);
       formData.append('language_code', request.languageCode || 'en-US');
       
       logger.info('Sending audio file to AI backend for transcription', {
         context: 'aiApiClient',
         operation: 'transcribeAudio',
-        audioSize: audioBlob.size,
+        audioUri: audioUri,
+        fileName: fileName,
+        mimeType: mimeType,
         languageCode: request.languageCode || 'en-US'
       });
       
@@ -341,6 +377,128 @@ export const aiApiClient = {
       logger.error('AI backend health check failed', {
         context: 'aiApiClient',
         operation: 'healthCheck',
+        error: error instanceof Error ? error.message : String(error)
+      });
+      
+      throw error;
+    }
+  },
+
+  /**
+   * Convert text to speech using ElevenLabs TTS API (Phase 2)
+   * For AI follow-up questions and guidance
+   * 
+   * @param request TTSRequest with text and optional voice_id
+   * @returns Promise<TTSResponse> Base64-encoded audio data
+   */
+  async synthesizeText(request: TTSRequest): Promise<TTSResponse> {
+    const startTime = Date.now();
+    
+    logger.info('TTS synthesis request initiated', {
+      context: 'aiApiClient',
+      operation: 'synthesizeText',
+      textLength: request.text.length,
+      voiceId: request.voice_id || 'default'
+    });
+    
+    if (!AI_BACKEND_URL) {
+      throw new Error('AI backend not configured');
+    }
+    
+    try {
+      const response = await fetch(`${AI_BACKEND_URL}/api/speech/synthesize`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': await getAuthHeader(),
+        },
+        body: JSON.stringify(request),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        logger.error('TTS synthesis API request failed', {
+          context: 'aiApiClient',
+          operation: 'synthesizeText',
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
+        
+        throw new Error(
+          errorData.detail || `TTS synthesis failed: ${response.status}`
+        );
+      }
+      
+      const result: TTSResponse = await response.json();
+      const requestTime = Date.now() - startTime;
+      
+      logger.info('TTS synthesis completed successfully', {
+        context: 'aiApiClient',
+        operation: 'synthesizeText',
+        audioSizeBytes: result.audio_base64.length,
+        voiceId: result.voice_id,
+        processingTimeMs: result.processing_time_ms,
+        totalRequestTimeMs: requestTime
+      });
+      
+      return result;
+      
+    } catch (error) {
+      const requestTime = Date.now() - startTime;
+      
+      logger.error('TTS synthesis request failed', {
+        context: 'aiApiClient',
+        operation: 'synthesizeText',
+        error: error instanceof Error ? error.message : String(error),
+        totalRequestTimeMs: requestTime
+      });
+      
+      throw error;
+    }
+  },
+
+  /**
+   * Get available voices for TTS synthesis (Phase 2)
+   * 
+   * @returns Promise<any> Available voices and their details
+   */
+  async getAvailableVoices(): Promise<any> {
+    logger.info('Fetching available TTS voices', {
+      context: 'aiApiClient',
+      operation: 'getAvailableVoices'
+    });
+    
+    if (!AI_BACKEND_URL) {
+      throw new Error('AI backend not configured');
+    }
+    
+    try {
+      const response = await fetch(`${AI_BACKEND_URL}/api/speech/voices`, {
+        method: 'GET',
+        headers: {
+          'Authorization': await getAuthHeader(),
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to get voices: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      logger.info('TTS voices fetched successfully', {
+        context: 'aiApiClient',
+        operation: 'getAvailableVoices',
+        voiceCount: result.voices?.length || 0
+      });
+      
+      return result;
+      
+    } catch (error) {
+      logger.error('Failed to fetch TTS voices', {
+        context: 'aiApiClient',
+        operation: 'getAvailableVoices',
         error: error instanceof Error ? error.message : String(error)
       });
       

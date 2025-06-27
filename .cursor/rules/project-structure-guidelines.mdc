@@ -7,6 +7,7 @@ alwaysApply: true
 
 .
 ├── AI_BACKEND_SETUP.md
+├── ELEVENLABS_MIGRATION_STATUS.md
 ├── README.md
 ├── app
 │   ├── (auth)
@@ -27,23 +28,40 @@ alwaysApply: true
 │   │   └── lexicon.tsx
 │   ├── +not-found.tsx
 │   ├── _layout.tsx
+│   ├── paywall.tsx
 │   └── reframe.tsx
 ├── app.json
 ├── archie-ai-backend
 │   ├── Dockerfile
 │   ├── README.md
+│   ├── __pycache__
+│   │   ├── main.cpython-311.pyc
+│   │   └── main.cpython-313.pyc
 │   ├── app
 │   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── __init__.cpython-311.pyc
+│   │   │   ├── __init__.cpython-313.pyc
+│   │   │   ├── auth.cpython-311.pyc
+│   │   │   ├── auth.cpython-313.pyc
+│   │   │   ├── logger.cpython-311.pyc
+│   │   │   ├── logger.cpython-313.pyc
+│   │   │   └── models.cpython-313.pyc
 │   │   ├── auth.py
 │   │   ├── logger.py
 │   │   ├── models.py
 │   │   └── routers
 │   │       ├── __init__.py
+│   │       ├── __pycache__
 │   │       ├── ai_summary.py
-│   │       └── speech.py
+│   │       ├── speech.py
+│   │       └── tts.py
 │   ├── env.example
+│   ├── google-credentials.json
 │   ├── main.py
-│   └── requirements.txt
+│   ├── requirements.txt
+│   ├── test_elevenlabs.py
+│   └── test_enhanced_summary.py
 ├── assets
 │   └── images
 │       ├── favicon.png
@@ -64,7 +82,16 @@ alwaysApply: true
 ├── package-lock.json
 ├── package.json
 ├── services
+│   ├── achievementsService.ts
+│   ├── dashboardService.ts
+│   ├── insightsService.ts
 │   ├── lexiconService.ts
 │   ├── onboardingService.ts
-│   └── sessionService.ts
+│   ├── sessionService.ts
+│   └── subscriptionService.ts
+├── test-assets
+│   ├── test-journal.aiff
+│   └── test-journal.m4a
 └── tsconfig.json
+
+20 directories, 68 files

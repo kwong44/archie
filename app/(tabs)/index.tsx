@@ -111,10 +111,36 @@ export default function WorkshopScreen() {
         false
       );
 
-      // Navigate to reframing screen with the recording
-      // In a real app, you'd process the audio here
+      // Enhanced logging for debugging audio recording
+      console.log('🎵 Audio recorded successfully:', {
+        uri: uri,
+        fileName: uri?.split('/').pop(),
+        fileExtension: uri?.split('.').pop()
+      });
+      
+      // Check if URI is valid before navigation
+      if (!uri) {
+        console.error('❌ No URI received from recording - cannot navigate');
+        return;
+      }
+      
+      // Small delay to ensure file is fully written before navigation
+      console.log('🚀 Attempting navigation to reframe screen in 500ms');
       setTimeout(() => {
-        router.push('/reframe');
+        console.log('🚀 Navigation executing NOW:', {
+          pathname: '/reframe',
+          audioUri: uri
+        });
+        
+        try {
+          router.push({
+            pathname: '/reframe',
+            params: { audioUri: uri }
+          });
+          console.log('✅ Router.push() called successfully');
+        } catch (navError) {
+          console.error('❌ Navigation error:', navError);
+        }
       }, 500);
     } catch (err) {
       console.error('Failed to stop recording', err);

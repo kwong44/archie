@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { ArrowLeft, Sparkles, RefreshCw } from 'lucide-react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { ArrowLeft, Sparkles, RefreshCw, Mic } from 'lucide-react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useAuth } from '@/context/AuthContext';
 import { LexiconService, WordPair } from '@/services/lexiconService';
 import { SessionService, TransformationApplied } from '@/services/sessionService';
+import { OnboardingService, UserPrinciple } from '@/services/onboardingService';
+import { aiApiClient } from '@/lib/aiApiClient';
 import { createContextLogger } from '@/lib/logger';
 
 // Create context-specific logger for reframe screen
@@ -15,17 +17,20 @@ const reframeLogger = createContextLogger('ReframeScreen');
 export default function ReframeScreen() {
   const router = useRouter();
   const { session } = useAuth();
+  const { audioUri } = useLocalSearchParams<{ audioUri?: string }>();
   
-  const [transcript, setTranscript] = useState(
-    "I'm feeling really anxious about this presentation tomorrow. I'm worried I'm going to mess up and everyone will think I'm incompetent. I always get so stressed about these things, and I feel like I'm just not good enough for this job. It's overwhelming having so many expectations on me."
-  );
-  
+  const [transcript, setTranscript] = useState<string>('');
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
   const [isReframing, setIsReframing] = useState(false);
   const [reframedWords, setReframedWords] = useState<{[key: string]: string}>({});
   const [userLexicon, setUserLexicon] = useState<WordPair[]>([]);
+  const [userPrinciples, setUserPrinciples] = useState<UserPrinciple[]>([]);
   const [loadingLexicon, setLoadingLexicon] = useState(true);
   const [appliedTransformations, setAppliedTransformations] = useState<TransformationApplied[]>([]);
   const [saving, setSaving] = useState(false);
+  const [aiSummary, setAiSummary] = useState<string>('');
+  const [generatingSummary, setGeneratingSummary] = useState(false);
 
   /**
    * Create a lookup object from user's lexicon for fast word matching
@@ -39,7 +44,66 @@ export default function ReframeScreen() {
   }, {} as Record<string, { newWord: string; lexiconId: string }>);
 
   /**
-   * Load user's lexicon data on component mount
+   * Transcribe audio using our STT service
+   */
+  const transcribeAudio = async (audioUri: string) => {
+    if (!session?.user) {
+      reframeLogger.error('No authenticated user for transcription');
+      setTranscriptionError('You must be logged in to transcribe audio.');
+      return;
+    }
+
+    setIsTranscribing(true);
+    setTranscriptionError(null);
+
+    try {
+      reframeLogger.info('Starting audio transcription', {
+        userId: session.user.id,
+        audioUri: audioUri.substring(0, 50) + '...'
+      });
+
+      // Call our STT service with the audio URI
+      const result = await aiApiClient.transcribeAudio({
+        audioUri: audioUri,
+        languageCode: 'en-US'
+      });
+      
+      setTranscript(result.transcript);
+      
+      reframeLogger.info('Audio transcription completed', {
+        userId: session.user.id,
+        transcriptLength: result.transcript.length,
+        confidence: result.confidence,
+        processingTime: result.processing_time_ms
+      });
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown transcription error';
+      
+      reframeLogger.error('Audio transcription failed', {
+        userId: session.user.id,
+        error: errorMessage
+      });
+      
+      setTranscriptionError('Failed to transcribe audio. Please try recording again.');
+      
+      Alert.alert(
+        'Transcription Error',
+        'Unable to process your audio recording. Please try again.',
+        [
+          { text: 'Retry', onPress: () => router.back() },
+          { text: 'Use Demo Text', onPress: () => {
+            setTranscript("I'm feeling really anxious about this presentation tomorrow. I'm worried I'm going to mess up and everyone will think I'm incompetent. I always get so stressed about these things, and I feel like I'm just not good enough for this job. It's overwhelming having so many expectations on me.");
+          }}
+        ]
+      );
+    } finally {
+      setIsTranscribing(false);
+    }
+  };
+
+  /**
+   * Load user's lexicon data and principles on component mount
    */
   useEffect(() => {
     const loadUserLexicon = async () => {
@@ -50,27 +114,34 @@ export default function ReframeScreen() {
       }
 
       try {
-        reframeLogger.info('Loading user lexicon for reframing', {
+        reframeLogger.info('Loading user lexicon and principles for reframing', {
           userId: session.user.id
         });
 
-        const wordPairs = await LexiconService.getUserWordPairs(session.user.id);
+        // Load both lexicon and principles in parallel
+        const [wordPairs, principles] = await Promise.all([
+          LexiconService.getUserWordPairs(session.user.id),
+          OnboardingService.getUserPrinciples(session.user.id)
+        ]);
+        
         setUserLexicon(wordPairs);
+        setUserPrinciples(principles);
 
-        reframeLogger.info('User lexicon loaded successfully', {
+        reframeLogger.info('User lexicon and principles loaded successfully', {
           userId: session.user.id,
-          wordPairsCount: wordPairs.length
+          wordPairsCount: wordPairs.length,
+          principlesCount: principles.length
         });
 
       } catch (error) {
-        reframeLogger.error('Failed to load user lexicon', {
+        reframeLogger.error('Failed to load user lexicon or principles', {
           userId: session.user.id,
           error: error instanceof Error ? error.message : 'Unknown error'
         });
         
         Alert.alert(
-          'Error Loading Lexicon',
-          'Unable to load your word transformations. Please try again.',
+          'Error Loading Data',
+          'Unable to load your word transformations and principles. Please try again.',
           [{ text: 'OK' }]
         );
       } finally {
@@ -78,8 +149,50 @@ export default function ReframeScreen() {
       }
     };
 
-    loadUserLexicon();
-  }, [session?.user]);
+    const initializeScreen = async () => {
+      // Load lexicon first
+      await loadUserLexicon();
+      
+      // Then process audio if provided
+      if (audioUri) {
+        reframeLogger.info('Audio URI received, starting transcription', {
+          audioUri: audioUri.substring(0, 50) + '...'
+        });
+        await transcribeAudio(audioUri);
+      } else {
+        reframeLogger.warn('No audio URI provided, using demo transcript');
+        setTranscript("I'm feeling really anxious about this presentation tomorrow. I'm worried I'm going to mess up and everyone will think I'm incompetent. I always get so stressed about these things, and I feel like I'm just not good enough for this job. It's overwhelming having so many expectations on me.");
+      }
+    };
+
+    initializeScreen();
+  }, [session?.user, audioUri]);
+
+  /**
+   * Generate AI summary when transcript is available
+   */
+  useEffect(() => {
+    const generateAndSetSummary = async () => {
+      if (transcript && !generatingSummary) {
+        setGeneratingSummary(true);
+        try {
+          const summary = await generateSummary();
+          setAiSummary(summary);
+        } catch (error) {
+          reframeLogger.error('Failed to generate summary in useEffect', {
+            userId: session?.user?.id,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+          // Set fallback summary on error
+          setAiSummary('Your practice of reframing language is a powerful step toward conscious self-authorship. Each transformation you make strengthens your ability to choose empowering perspectives.');
+        } finally {
+          setGeneratingSummary(false);
+        }
+      }
+    };
+
+    generateAndSetSummary();
+  }, [transcript, reframedWords]); // Re-generate when transcript or transformations change
 
   const reframeWord = (oldWord: string, newWord: string, lexiconId: string, position: number) => {
     setIsReframing(true);
@@ -148,9 +261,54 @@ export default function ReframeScreen() {
     });
   };
 
-  const generateSummary = () => {
-    const reframedText = getDisplayText();
-    return `You're preparing for an important presentation, feeling excited about the opportunity to share your work. This energy you're experiencing shows how much you care about doing well. Remember that growth happens when we step into new challenges, and you're exactly where you need to be in your journey. The expectations you feel are a sign that others believe in your capabilities.`;
+  /**
+   * Generates an AI-powered encouraging summary using Gemini API
+   * Compares original transcript with reframed text to provide personalized guidance
+   * 
+   * @returns Promise<string> AI-generated encouraging summary
+   */
+  const generateSummary = async (): Promise<string> => {
+    if (!session?.user) {
+      return 'Complete your session to receive personalized guidance.';
+    }
+
+    try {
+      const reframedText = getDisplayText();
+      
+      reframeLogger.info('Generating AI summary', {
+        userId: session.user.id,
+        originalTextLength: transcript.length,
+        reframedTextLength: reframedText.length,
+        transformationsCount: appliedTransformations.length
+      });
+
+      // Call the AI backend to generate personalized summary
+      const summaryResponse = await aiApiClient.generateSummary({
+        original_text: transcript,
+        reframed_text: reframedText,
+        transformation_count: appliedTransformations.length,
+        // Include user principles from onboarding for more personalized guidance
+        user_principles: userPrinciples.map(p => p.principle)
+      });
+
+      reframeLogger.info('AI summary generated successfully', {
+        userId: session.user.id,
+        summaryLength: summaryResponse.summary.length,
+        tone: summaryResponse.tone,
+        processingTime: summaryResponse.processing_time_ms
+      });
+
+      return summaryResponse.summary;
+
+    } catch (error) {
+      reframeLogger.error('Failed to generate AI summary', {
+        userId: session.user.id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+
+      // Fallback to encouraging generic message if AI fails
+      return 'Your practice of reframing language is a powerful step toward conscious self-authorship. Each transformation you make strengthens your ability to choose empowering perspectives. Keep building this muscle of mindful language.';
+    }
   };
 
   /**
@@ -172,12 +330,18 @@ export default function ReframeScreen() {
 
     try {
       const reframedText = getDisplayText();
-      const aiSummary = generateSummary();
+      
+      // Use the pre-generated AI summary, or generate one if not available
+      let finalAiSummary = aiSummary;
+      if (!finalAiSummary) {
+        reframeLogger.info('No pre-generated summary available, generating new one');
+        finalAiSummary = await generateSummary();
+      }
 
       await SessionService.createSession(session.user.id, {
         original_transcript: transcript,
         reframed_text: reframedText,
-        ai_summary: aiSummary,
+        ai_summary: finalAiSummary,
         transformations_applied: appliedTransformations,
         session_duration_seconds: 0, // TODO: Track actual duration
       });
@@ -233,19 +397,40 @@ export default function ReframeScreen() {
             <ActivityIndicator size="large" color="#FFC300" />
             <Text style={styles.loadingText}>Loading your lexicon...</Text>
           </View>
+        ) : isTranscribing ? (
+          <View style={styles.loadingContainer}>
+            <Mic color="#FFC300" size={48} strokeWidth={2} />
+            <ActivityIndicator size="large" color="#FFC300" style={{ marginTop: 16 }} />
+            <Text style={styles.loadingText}>Transcribing your thoughts...</Text>
+            <Text style={styles.loadingSubtext}>This may take a few moments</Text>
+          </View>
+        ) : transcriptionError ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{transcriptionError}</Text>
+            <TouchableOpacity 
+              style={styles.retryButton}
+              onPress={() => router.back()}
+            >
+              <Text style={styles.retryButtonText}>Try Recording Again</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           <>
             <View style={styles.transcriptContainer}>
               <Text style={styles.sectionTitle}>Your Thoughts</Text>
               <View style={styles.transcriptBox}>
                 <View style={styles.transcriptContent}>
-                  {renderTranscriptWithHighlights()}
+                  {transcript ? renderTranscriptWithHighlights() : (
+                    <Text style={styles.noTranscriptText}>No transcript available</Text>
+                  )}
                 </View>
               </View>
               
-              <Text style={styles.helpText}>
-                Tap the <Text style={styles.blueText}>blue highlighted words</Text> to reframe them with more empowering language
-              </Text>
+              {transcript && (
+                <Text style={styles.helpText}>
+                  Tap the <Text style={styles.blueText}>blue highlighted words</Text> to reframe them with more empowering language
+                </Text>
+              )}
             </View>
 
         {/* Word Transformations */}
@@ -269,7 +454,16 @@ export default function ReframeScreen() {
             <Text style={styles.summaryTitle}>The Guide's Reflection</Text>
           </View>
           <View style={styles.summaryBox}>
-            <Text style={styles.summaryText}>{generateSummary()}</Text>
+            {generatingSummary ? (
+              <View style={styles.summaryLoadingContainer}>
+                <ActivityIndicator size="small" color="#FFC300" />
+                <Text style={styles.summaryLoadingText}>Generating personalized reflection...</Text>
+              </View>
+            ) : (
+              <Text style={styles.summaryText}>
+                {aiSummary || 'Your reflection will appear here once generated...'}
+              </Text>
+            )}
           </View>
         </View>
 
@@ -501,5 +695,55 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     color: '#9CA3AF',
     marginTop: 16,
+  },
+  loadingSubtext: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#6B7280',
+    marginTop: 8,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 50,
+    paddingHorizontal: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#E53E3E',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#FFC300',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+  },
+  retryButtonText: {
+    color: '#121820',
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+  },
+  noTranscriptText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#6B7280',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  summaryLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  summaryLoadingText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#9CA3AF',
+    marginLeft: 8,
+    fontStyle: 'italic',
   },
 });

@@ -43,10 +43,11 @@ Epic 3: The Core Loop - Workshop & Reframing
 ✅ Task 3.1: Implement the "Workshop" home screen UI (app/(tabs)/index.tsx), including the pulsing orb animation.
 ✅ Task 3.2: Implement voice recording functionality using expo-av.
 ✅ Task 3.3: Implement the "Reframe" screen UI (app/reframe.tsx) with areas for the transcript and AI summary.
-✅ Task 3.4: Integrate the specialized AI backend for Speech-to-Text transcription. The frontend will send the audio file from expo-av and receive the transcript.
+✅ Task 3.4: Integrate ElevenLabs for Speech-to-Text transcription. The frontend sends audio via the Python backend using `scribe_v1` model and receives the transcript.
 ✅ Task 3.5: Connect the interactive reframing logic on the Reframe screen to the user's actual Lexicon data from Supabase.
 ✅ Task 3.6: Integrate the AI backend for generating the "Guide's Reflection." The frontend will send the final reframed text and receive the AI-generated summary.
 ✅ Task 3.7: Implement logic to save the completed session (transcript, reframes, summary) to the Supabase database.
+✅ Task 3.8: **[PHASE 2 READY]** ElevenLabs Text-to-Speech integration complete - AI follow-up synthesis with `scribe_v1` model available via `/api/speech/synthesize` endpoint.
 
 Epic 4: The Toolkit - Lexicon Management
 
@@ -57,15 +58,15 @@ Epic 4: The Toolkit - Lexicon Management
 Epic 5: The Progress - Dashboard & Gamification
 
 ✅ Task 5.1: Implement the "Dashboard" screen UI (app/(tabs)/dashboard.tsx) with cards for metrics, a weekly chart, insights, and achievements.
-⏳ Task 5.2: Connect the Dashboard to Supabase to pull and display real user data (Day Streak, Weekly Duration, Reframing Rate).
-⏳ Task 5.3: Implement the backend logic to calculate and store user achievements based on their activity.
-⏳ Task 5.4: Implement the "Insight Engine" on the backend to generate simple, rule-based insights based on user data.
+✅ Task 5.2: Connect the Dashboard to Supabase to pull and display real user data (Day Streak, Weekly Duration, Reframing Rate).
+✅ Task 5.3: Implement the backend logic to calculate and store user achievements based on their activity.
+✅ Task 5.4: Implement the "Insight Engine" on the backend to generate simple, rule-based insights based on user data.
 Epic 6: The Guide - Settings & Support
 
 ✅ Task 6.1: Implement the "Guide" (Settings) screen UI (app/(tabs)/guide.tsx) with categorized settings and an upgrade banner.
-⏳ Task 6.2: Implement the "Upgrade" flow by integrating RevenueCat and linking to a paywall screen.
+✅ Task 6.2: Implement the "Upgrade" flow by integrating RevenueCat and linking to a paywall screen.
 ✅ Task 6.3: Implement user sign-out functionality.
-⏳ Task 6.4: Connect the "App Info" section to display dynamic data (e.g., total sessions from Supabase).
+✅ Task 6.4: Connect the "App Info" section to display dynamic data (e.g., total sessions from Supabase).
 
 4. Future Considerations (Out of Scope for V1)
 Auditory Reprogrammer: A "Sonic Weaver" feature that generates personalized audio sessions with binaural beats and subtle repetitions of the user's "New Words."

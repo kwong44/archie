@@ -32,9 +32,9 @@ export default function OnboardingScreen() {
             <Sparkles color="#FFC300" size={48} strokeWidth={1.5} />
           </View>
           
-          <Text style={styles.title}>The Architect</Text>
+          <Text style={styles.title}>Archie</Text>
           <Text style={styles.subtitle}>
-            Reshape your reality by transforming your language
+            Become the architect of your reality by transforming your language
           </Text>
         </View>
 

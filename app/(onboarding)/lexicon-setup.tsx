@@ -73,7 +73,32 @@ const SAMPLE_WORD_PAIRS: WordPair[] = [
     oldWord: 'difficult',
     newWord: 'challenging',
     description: 'Embrace growth opportunities'
+  },
+  {
+    id: '9',
+    oldWord: 'worried',
+    newWord: 'preparing',
+    description: 'Channel concern into proactive planning'
+  },
+  {
+    id: '10',
+    oldWord: 'impossible',
+    newWord: 'unprecedented',
+    description: 'Transform barriers into breakthrough opportunities'
+  },
+  {
+    id: '11',
+    oldWord: 'lost',
+    newWord: 'discovering',
+    description: 'Trust the journey of self-exploration'
+  },
+  {
+    id: '12',
+    oldWord: 'broken',
+    newWord: 'rebuilding',
+    description: 'Honor the strength found in reconstruction'
   }
+  
 ];
 
 /**

@@ -4,17 +4,47 @@
     "slug": "archie-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/appstore.png",
+    "splash": {
+      "image": "./assets/images/appstore.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#121820"
+    },
     "scheme": "archie",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.archie.app",
+      "icon": "./assets/images/AppIcons/Assets.xcassets/AppIcon.appiconset/1024.png",
+      "splash": {
+        "image": "./assets/images/appstore.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#121820",
+        "tabletImage": "./assets/images/appstore.png"
+      },
       "infoPlist": {
         "NSMicrophoneUsageDescription": "This app needs access to your microphone to record audio for your journal entries and personal reflections."
       }
     },
     "android": {
+      "package": "com.archie.app",
+      "icon": "./assets/images/playstore.png",
+      "splash": {
+        "image": "./assets/images/playstore.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#121820",
+        "mdpi": "./assets/images/playstore.png",
+        "hdpi": "./assets/images/playstore.png",
+        "xhdpi": "./assets/images/playstore.png",
+        "xxhdpi": "./assets/images/playstore.png",
+        "xxxhdpi": "./assets/images/playstore.png"
+      },
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/AppIcons/android/res/mipmap-xxxhdpi/ic_launcher.png",
+        "backgroundColor": "#121820"
+      },
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.archie.app",
       "permissions": [
         "android.permission.RECORD_AUDIO"
       ]
@@ -28,6 +58,7 @@
       "expo-router",
       "expo-font",
       "expo-web-browser",
+      "expo-splash-screen",
       [
         "expo-av",
         {

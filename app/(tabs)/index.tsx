@@ -13,6 +13,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Audio } from 'expo-av';
 import { useRouter } from 'expo-router';
+import { useAnalytics } from '@/lib/analytics';
+import { logger } from '@/lib/logger';
 
 const { width, height } = Dimensions.get('window');
 
@@ -22,6 +24,9 @@ export default function WorkshopScreen() {
   const [userName] = useState('Creator'); // In real app, get from user profile
   const recording = useRef<Audio.Recording | null>(null);
   const router = useRouter();
+  
+  // PostHog analytics integration (our wrapper)
+  const analytics = useAnalytics();
   
   // Animation values
   const pulseScale = useSharedValue(1);
@@ -40,6 +45,17 @@ export default function WorkshopScreen() {
   const currentPrompt = prompts[Math.floor(Date.now() / (1000 * 60 * 60 * 6)) % prompts.length];
 
   useEffect(() => {
+    // Track screen view for analytics
+    analytics.trackNavigation('workshop', {
+      metadata: { currentPrompt }
+    });
+    
+    logger.info('Workshop screen loaded', { 
+      userName, 
+      currentPrompt,
+      hasPostHogAnalytics: !!analytics.posthog
+    });
+
     // Request audio permissions
     (async () => {
       const { status } = await Audio.requestPermissionsAsync();
@@ -55,7 +71,7 @@ export default function WorkshopScreen() {
       -1,
       false
     );
-  }, []);
+  }, [analytics, currentPrompt, userName]);
 
   const startRecording = async () => {
     if (!hasPermission) {
@@ -75,6 +91,16 @@ export default function WorkshopScreen() {
       );
       recording.current = newRecording;
       setIsRecording(true);
+
+      // Track recording start
+      analytics.trackJournaling('recording_started', {
+        metadata: { 
+          prompt: currentPrompt,
+          platform: Platform.OS
+        }
+      });
+      
+      logger.info('Audio recording started', { prompt: currentPrompt });
 
       // Animate to recording state
       backgroundOpacity.value = withTiming(0.3, { duration: 500 });
@@ -100,6 +126,15 @@ export default function WorkshopScreen() {
       recording.current = null;
       setIsRecording(false);
 
+      // Track recording completion
+      analytics.trackJournaling('recording_completed', {
+        metadata: { 
+          hasAudioUri: !!uri,
+          fileName: uri?.split('/').pop(),
+          fileExtension: uri?.split('.').pop()
+        }
+      });
+
       // Animate back to normal state
       backgroundOpacity.value = withTiming(1, { duration: 500 });
       pulseScale.value = withRepeat(
@@ -112,7 +147,7 @@ export default function WorkshopScreen() {
       );
 
       // Enhanced logging for debugging audio recording
-      console.log('🎵 Audio recorded successfully:', {
+      logger.info('Audio recorded successfully', {
         uri: uri,
         fileName: uri?.split('/').pop(),
         fileExtension: uri?.split('.').pop()
@@ -120,14 +155,15 @@ export default function WorkshopScreen() {
       
       // Check if URI is valid before navigation
       if (!uri) {
-        console.error('❌ No URI received from recording - cannot navigate');
+        logger.error('No URI received from recording - cannot navigate');
+        analytics.trackError('recording_no_uri_error', 'workshop');
         return;
       }
       
       // Small delay to ensure file is fully written before navigation
-      console.log('🚀 Attempting navigation to reframe screen in 500ms');
+      logger.info('Attempting navigation to reframe screen in 500ms');
       setTimeout(() => {
-        console.log('🚀 Navigation executing NOW:', {
+        logger.info('Navigation executing NOW', {
           pathname: '/reframe',
           audioUri: uri
         });
@@ -137,9 +173,21 @@ export default function WorkshopScreen() {
             pathname: '/reframe',
             params: { audioUri: uri }
           });
-          console.log('✅ Router.push() called successfully');
+          
+          // Track successful navigation
+          analytics.trackNavigation('reframe', {
+            metadata: { 
+              fromScreen: 'workshop',
+              hasAudioUri: true,
+              navigationMethod: 'recording_completion'
+            }
+          });
+          
+          logger.info('Router.push() called successfully');
         } catch (navError) {
-          console.error('❌ Navigation error:', navError);
+          const errorMessage = navError instanceof Error ? navError.message : String(navError);
+          logger.error('Navigation error', { error: navError });
+          analytics.trackError(errorMessage, 'workshop_navigation');
         }
       }, 500);
     } catch (err) {

@@ -7,6 +7,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { createContextLogger } from '../lib/logger';
 import { SubscriptionService } from '@/services/subscriptionService';
+import { PostHogProvider } from 'posthog-react-native';
 import Constants from 'expo-constants';
 
 // Create a context-specific logger for navigation workflows
@@ -76,6 +77,7 @@ function RootLayoutNav() {
 
 
 export default function RootLayout() {
+  // ALL HOOKS MUST BE CALLED AT THE TOP LEVEL (Rules of Hooks)
   useFrameworkReady();
 
   const [fontsLoaded, fontError] = useFonts({
@@ -83,6 +85,18 @@ export default function RootLayout() {
     'Inter-SemiBold': Inter_600SemiBold,
     'Inter-Bold': Inter_700Bold,
   });
+
+  /**
+   * PostHog analytics configuration - Following official documentation pattern
+   * Uses environment variables for secure configuration
+   */
+  const postHogApiKey = Constants.expoConfig?.extra?.postHogApiKey;
+  const postHogHost = Constants.expoConfig?.extra?.postHogHost || 'https://us.i.posthog.com';
+  
+  // Check if we have a valid PostHog API key (starts with 'phc_')
+  const hasValidApiKey = postHogApiKey && 
+    postHogApiKey !== '$EXPO_PUBLIC_POSTHOG_API_KEY' && 
+    postHogApiKey.startsWith('phc_');
 
   /**
    * Initialize RevenueCat when the app starts
@@ -117,14 +131,42 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
+  // Log PostHog configuration status
+  useEffect(() => {
+    const isDisabled = __DEV__ || !hasValidApiKey;
+    
+    if (hasValidApiKey && !__DEV__) {
+      navLogger.info('PostHog analytics enabled', { 
+        host: postHogHost,
+        keyPrefix: postHogApiKey?.substring(0, 8) + '...'
+      });
+    } else {
+      navLogger.info('PostHog analytics disabled', {
+        reason: __DEV__ ? 'development_mode' : 'missing_api_key',
+        apiKeyProvided: !!postHogApiKey,
+        isDevelopment: __DEV__
+      });
+    }
+  }, [postHogApiKey, postHogHost, hasValidApiKey]);
+
+  // Early return AFTER all hooks are called
   if (!fontsLoaded && !fontError) {
     return null;
   }
-
+  
   return (
-    <AuthProvider>
-      <RootLayoutNav />
-      <StatusBar style="light" />
-    </AuthProvider>
+    <PostHogProvider 
+      apiKey={hasValidApiKey ? postHogApiKey : 'phc_dev_placeholder_key_12345'}
+      options={{
+        host: postHogHost,
+        // Disable PostHog in development OR when no valid API key is provided
+        disabled: __DEV__ || !hasValidApiKey,
+      }}
+    >
+      <AuthProvider>
+        <RootLayoutNav />
+        <StatusBar style="light" />
+      </AuthProvider>
+    </PostHogProvider>
   );
 }

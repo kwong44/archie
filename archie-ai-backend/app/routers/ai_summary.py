@@ -18,10 +18,25 @@ security = HTTPBearer()
 
 # Configure Gemini API
 gemini_api_key = os.getenv("GEMINI_API_KEY")
+logger.info("Gemini API configuration", extra={
+    'has_api_key': bool(gemini_api_key),
+    'api_key_length': len(gemini_api_key) if gemini_api_key else 0
+})
+
 if gemini_api_key:
-    genai.configure(api_key=gemini_api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    try:
+        genai.configure(api_key=gemini_api_key)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        logger.info("Gemini model initialized successfully", extra={
+            'model_name': 'gemini-1.5-flash'
+        })
+    except Exception as e:
+        logger.error("Failed to initialize Gemini model", extra={
+            'error': str(e)
+        })
+        model = None
 else:
+    logger.error("No Gemini API key found in environment variables")
     model = None
 
 @router.post("/summarize", response_model=AISummaryResponse)
@@ -36,7 +51,15 @@ async def generate_summary(
     
     logger.info("AI summary generation started", extra={'user_id': user_id})
     
+    # Debug: Check model state
+    logger.info("Model state check", extra={
+        'user_id': user_id,
+        'model_exists': model is not None,
+        'model_type': type(model).__name__ if model else None
+    })
+    
     if not model:
+        logger.error("AI service unavailable - model is None", extra={'user_id': user_id})
         raise HTTPException(status_code=503, detail="AI service unavailable")
     
     try:

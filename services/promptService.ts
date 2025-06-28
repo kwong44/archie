@@ -43,8 +43,8 @@ export class PromptService {
     try {
       // Get user's recent journal entries to analyze patterns
       const { data: recentEntries, error } = await supabase
-        .from('sessions')
-        .select('transcript, reframed_text, created_at')
+        .from('journal_sessions')
+        .select('original_transcript, reframed_text, created_at')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(20);
@@ -96,7 +96,7 @@ export class PromptService {
     };
 
     const exploredCategories: PromptCategory[] = [];
-    const allText = entries.map(e => `${e.transcript} ${e.reframed_text}`).join(' ').toLowerCase();
+    const allText = entries.map(e => `${e.original_transcript} ${e.reframed_text}`).join(' ').toLowerCase();
 
     for (const [category, keywords] of Object.entries(categoryKeywords)) {
       const hasKeywords = keywords.some(keyword => allText.includes(keyword));
@@ -142,6 +142,11 @@ export class PromptService {
           title: "Conflict Reframing", 
           prompt: "Recall a recent disagreement. What if you replaced 'they're wrong' with 'we see differently'?",
           level: 'medium'
+        },
+        {
+          title: "Love Language Discovery",
+          prompt: "How do you express care for others? What if 'I should do more' became 'I choose to show love differently'?",
+          level: 'deep'
         }
       ],
       [PromptCategory.WORK_CAREER]: [
@@ -149,6 +154,16 @@ export class PromptService {
           title: "Work Energy Audit",
           prompt: "What tasks at work drain you vs. energize you? How might you reframe the draining ones?",
           level: 'surface'
+        },
+        {
+          title: "Career Visioning",
+          prompt: "Where do you see your career in 3 years? What if 'I don't know' became 'I'm exploring possibilities'?",
+          level: 'medium'
+        },
+        {
+          title: "Purpose Alignment",
+          prompt: "How does your current work connect to your deeper purpose? Reframe any 'meaningless' work as 'stepping stones'.",
+          level: 'deep'
         }
       ],
       [PromptCategory.FEARS_ANXIETIES]: [
@@ -156,9 +171,103 @@ export class PromptService {
           title: "Fear Transformation",
           prompt: "What's one fear you carry? What if instead of 'I'm afraid of...' you said 'I'm curious about...'?",
           level: 'deep'
+        },
+        {
+          title: "Anxiety Reframing",
+          prompt: "When you feel anxious, what words run through your mind? How could you shift them to be more gentle?",
+          level: 'medium'
+        },
+        {
+          title: "Courage Discovery",
+          prompt: "Think of a time you were brave. What if 'I can't handle this' became 'I've handled challenges before'?",
+          level: 'surface'
+        }
+      ],
+      [PromptCategory.PERSONAL_GROWTH]: [
+        {
+          title: "Growth Edge Exploration",
+          prompt: "What's one area where you want to grow? What if 'I'm not good at...' became 'I'm learning to...'?",
+          level: 'surface'
+        },
+        {
+          title: "Habit Formation",
+          prompt: "What habit would transform your daily life? How could you reframe past 'failures' as 'practice rounds'?",
+          level: 'medium'
+        },
+        {
+          title: "Identity Evolution",
+          prompt: "Who are you becoming? What if 'I'm not that type of person' became 'I'm growing into that person'?",
+          level: 'deep'
+        }
+      ],
+      [PromptCategory.HEALTH_WELLNESS]: [
+        {
+          title: "Energy Check-in",
+          prompt: "How is your body feeling today? What if 'I'm exhausted' became 'I'm ready to restore my energy'?",
+          level: 'surface'
+        },
+        {
+          title: "Wellness Priorities",
+          prompt: "What does taking care of yourself look like? How could you reframe self-care as self-respect?",
+          level: 'medium'
+        },
+        {
+          title: "Body Wisdom",
+          prompt: "What is your body trying to tell you? What if physical discomfort became a 'message to decode'?",
+          level: 'deep'
+        }
+      ],
+      [PromptCategory.DREAMS_ASPIRATIONS]: [
+        {
+          title: "Dream Exploration",
+          prompt: "What's one dream you've been carrying? What if 'it's impossible' became 'it's possible in ways I haven't imagined yet'?",
+          level: 'surface'
+        },
+        {
+          title: "Vision Clarification",
+          prompt: "If anything were possible, what would you create? How could you shift from 'someday' to 'today I begin'?",
+          level: 'medium'
+        },
+        {
+          title: "Legacy Reflection",
+          prompt: "What impact do you want to have? What if 'I'm not important enough' became 'my unique contribution matters'?",
+          level: 'deep'
+        }
+      ],
+      [PromptCategory.PAST_EXPERIENCES]: [
+        {
+          title: "Memory Reframing",
+          prompt: "Think of a challenging past experience. What if it was exactly what you needed to become who you are?",
+          level: 'surface'
+        },
+        {
+          title: "Wisdom Extraction",
+          prompt: "What did a difficult time teach you? How could past 'mistakes' become 'learning investments'?",
+          level: 'medium'
+        },
+        {
+          title: "Healing Integration",
+          prompt: "How has your past shaped your strength? What if old wounds became 'sources of compassion and wisdom'?",
+          level: 'deep'
+        }
+      ],
+      [PromptCategory.DAILY_MOMENTS]: [
+        {
+          title: "Present Moment Awareness",
+          prompt: "What's happening around you right now? What if this ordinary moment contains something extraordinary?",
+          level: 'surface'
+        },
+        {
+          title: "Gratitude Transformation",
+          prompt: "What's one small thing you appreciate today? How could you shift from 'taking for granted' to 'receiving gifts'?",
+          level: 'medium'
+        },
+        {
+          title: "Mindful Reflection",
+          prompt: "How are you showing up in this moment? What if every interaction is a chance to practice your values?",
+          level: 'deep'
         }
       ]
-      // Add more categories as needed
     };
 
     const prompts: JournalPrompt[] = [];
@@ -225,26 +334,51 @@ export class PromptService {
    */
   static async trackPromptEngagement(
     userId: string, 
-    promptId: string, 
+    prompt: JournalPrompt, 
     action: 'viewed' | 'used' | 'skipped'
   ): Promise<void> {
-    logger.info('Tracking prompt engagement', { userId, promptId, action });
+    logger.info('Tracking prompt engagement', { userId, promptId: prompt.id, action });
     
     try {
       const { error } = await supabase
         .from('prompt_engagement')
         .insert({
           user_id: userId,
-          prompt_id: promptId,
+          prompt_id: prompt.id,
+          prompt_category: prompt.category,
+          prompt_title: prompt.title,
+          prompt_text: prompt.prompt,
           action,
           created_at: new Date().toISOString()
         });
 
       if (error) {
-        logger.error('Failed to track prompt engagement', { userId, promptId, error });
+        logger.error('Failed to track prompt engagement', { 
+          userId, 
+          promptId: prompt.id, 
+          error 
+        });
+        
+        // Track the error for monitoring
+        throw error;
+      } else {
+        logger.info('Prompt engagement tracked successfully', { 
+          userId, 
+          promptId: prompt.id, 
+          category: prompt.category, 
+          title: prompt.title,
+          action 
+        });
       }
     } catch (error) {
-      logger.error('Error tracking prompt engagement', { userId, promptId, error });
+      logger.error('Error tracking prompt engagement', { 
+        userId, 
+        promptId: prompt.id, 
+        error 
+      });
+      
+      // Re-throw to let calling code handle the error appropriately
+      throw error;
     }
   }
 } 

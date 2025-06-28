@@ -12,13 +12,23 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
+# 🔧 CRITICAL: Load environment variables FIRST before importing routers
+# This ensures .env variables are available when router modules initialize
+from pathlib import Path
+env_path = Path('.') / '.env'
+load_result = load_dotenv(dotenv_path=env_path)
+
+# Debug: Check if .env file was loaded
+print(f"🔧 DEBUG: .env file exists: {env_path.exists()}")
+print(f"🔧 DEBUG: load_dotenv result: {load_result}")
+print(f"🔧 DEBUG: GEMINI_API_KEY after load: {os.getenv('GEMINI_API_KEY', 'NOT_FOUND')[:20] if os.getenv('GEMINI_API_KEY') else 'NOT_FOUND'}")
+print(f"🔧 DEBUG: Current working directory: {os.getcwd()}")
+
+# NOW import routers after environment is loaded
 from app.logger import logger
 from app.auth import verify_jwt
 from app.routers import speech, ai_summary, tts
 from app.models import HealthResponse
-
-# Load environment variables
-load_dotenv()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

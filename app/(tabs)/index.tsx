@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Mic, MicOff } from 'lucide-react-native';
 import Animated, { 
@@ -14,7 +14,10 @@ import Animated, {
 import { Audio } from 'expo-av';
 import { useRouter } from 'expo-router';
 import { useAnalytics } from '@/lib/analytics';
+import { PromptService, JournalPrompt } from '@/services/promptService';
+import { PromptCard } from '@/components/PromptCard';
 import { logger } from '@/lib/logger';
+import { supabase } from '@/lib/supabase';
 
 const { width, height } = Dimensions.get('window');
 
@@ -22,6 +25,10 @@ export default function WorkshopScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
   const [userName] = useState('Creator'); // In real app, get from user profile
+  const [journalPrompts, setJournalPrompts] = useState<JournalPrompt[]>([]);
+  const [loadingPrompts, setLoadingPrompts] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [promptsExpanded, setPromptsExpanded] = useState(false); // New state for collapsible prompts
   const recording = useRef<Audio.Recording | null>(null);
   const router = useRouter();
   
@@ -71,7 +78,178 @@ export default function WorkshopScreen() {
       -1,
       false
     );
-  }, [analytics, currentPrompt, userName]);
+  }, [currentPrompt, userName]);
+
+  /**
+   * Fetches current user ID and loads personalized prompts
+   * Uses Supabase auth session to get authenticated user
+   */
+  useEffect(() => {
+    const loadUserAndPrompts = async () => {
+      try {
+        // Get current user from Supabase session
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user?.id) {
+          setCurrentUserId(session.user.id);
+          logger.info('Current user loaded', { userId: session.user.id });
+          
+          // Fetch personalized prompts for the user
+          const personalizedPrompts = await PromptService.getPersonalizedPrompts(session.user.id, 3);
+          setJournalPrompts(personalizedPrompts);
+          
+          logger.info('Personalized prompts loaded', { 
+            userId: session.user.id,
+            promptCount: personalizedPrompts.length,
+            categories: personalizedPrompts.map(p => p.category)
+          });
+          
+          // Track prompt loading analytics - moved outside of dependency array
+          analytics.trackEngagement('prompt_viewed', {
+            feature: 'intelligent_prompts',
+            metadata: {
+              promptCount: personalizedPrompts.length,
+              categories: personalizedPrompts.map(p => p.category),
+              hasPersonalized: personalizedPrompts.some(p => p.isPersonalized)
+            }
+          });
+        }
+      } catch (error) {
+        logger.error('Failed to load prompts', { error });
+        
+        // Show fallback prompts if personalization fails
+        const fallbackPrompts = await PromptService.getPersonalizedPrompts('fallback_user', 2);
+        setJournalPrompts(fallbackPrompts);
+      } finally {
+        setLoadingPrompts(false);
+      }
+    };
+
+    loadUserAndPrompts();
+  }, []);
+
+  /**
+   * Handles when user selects a prompt to use for journaling
+   * Navigates to recording with the selected prompt
+   */
+  const handlePromptPress = async (selectedPrompt: JournalPrompt) => {
+    logger.info('User selected prompt', {
+      promptId: selectedPrompt.id,
+      category: selectedPrompt.category,
+      title: selectedPrompt.title
+    });
+
+    // Track prompt engagement in Supabase for future personalization
+    if (currentUserId) {
+      try {
+        await PromptService.trackPromptEngagement(currentUserId, selectedPrompt, 'used');
+        logger.debug('Prompt usage tracked successfully', { promptId: selectedPrompt.id });
+      } catch (error) {
+        logger.error('Failed to track prompt usage', { 
+          promptId: selectedPrompt.id, 
+          userId: currentUserId, 
+          error 
+        });
+        
+        // Track this error for monitoring but don't stop the UX flow
+        analytics.trackError('Failed to track prompt engagement', 'workshop', {
+          metadata: { promptId: selectedPrompt.id, action: 'used' }
+        });
+      }
+    }
+
+    // Store selected prompt in router params and navigate to recording
+    router.push({
+      pathname: '/reframe',
+      params: {
+        selectedPrompt: selectedPrompt.prompt,
+        promptCategory: selectedPrompt.category,
+        promptTitle: selectedPrompt.title
+      }
+    });
+  };
+
+  /**
+   * Handles when user skips a prompt
+   * Removes it from the current list and tracks analytics
+   */
+  const handlePromptSkip = async (promptId: string) => {
+    logger.info('User skipped prompt', { promptId });
+
+    // Find the full prompt object from current list for tracking
+    const skippedPrompt = journalPrompts.find(prompt => prompt.id === promptId);
+
+    // Track skip engagement in Supabase with error handling
+    if (currentUserId && skippedPrompt) {
+      try {
+        await PromptService.trackPromptEngagement(currentUserId, skippedPrompt, 'skipped');
+        logger.debug('Skip engagement tracked successfully', { promptId });
+      } catch (error) {
+        logger.error('Failed to track skip engagement', { 
+          promptId, 
+          userId: currentUserId, 
+          error 
+        });
+        
+        // Track this error for monitoring but don't stop the UX flow
+        analytics.trackError('Failed to track prompt engagement', 'workshop', {
+          metadata: { promptId, action: 'skipped' }
+        });
+      }
+    } else if (currentUserId && !skippedPrompt) {
+      logger.warn('Could not find prompt object for tracking skip', { promptId });
+    }
+
+    // Remove the skipped prompt from current list (always do this regardless of tracking success)
+    setJournalPrompts(prevPrompts => 
+      prevPrompts.filter(prompt => prompt.id !== promptId)
+    );
+
+    // If no prompts left, load more
+    if (journalPrompts.length <= 1 && currentUserId) {
+      loadMorePrompts();
+    }
+  };
+
+  /**
+   * Loads additional prompts when current ones are exhausted
+   */
+  const loadMorePrompts = async () => {
+    if (!currentUserId) return;
+
+    try {
+      const additionalPrompts = await PromptService.getPersonalizedPrompts(currentUserId, 2);
+      setJournalPrompts(additionalPrompts);
+      
+      logger.info('Additional prompts loaded', { 
+        count: additionalPrompts.length 
+      });
+    } catch (error) {
+      logger.error('Failed to load additional prompts', { error });
+    }
+  };
+
+  /**
+   * Toggles the expansion state of the prompts section
+   * Tracks analytics when user explores prompts
+   */
+  const togglePromptsExpansion = () => {
+    const newExpanded = !promptsExpanded;
+    setPromptsExpanded(newExpanded);
+    
+    logger.info('Prompts section toggled', { 
+      expanded: newExpanded,
+      promptCount: journalPrompts.length 
+    });
+
+    // Track engagement when user expands to explore prompts
+    if (newExpanded) {
+      analytics.trackEngagement('feature_discovered', {
+        feature: 'suggested_reflections',
+        metadata: { promptCount: journalPrompts.length }
+      });
+    }
+  };
 
   const startRecording = async () => {
     if (!hasPermission) {
@@ -218,33 +396,89 @@ export default function WorkshopScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Animated.View style={[styles.backgroundElements, backgroundAnimatedStyle]}>
-        <Text style={styles.greeting}>Hello, {userName}.</Text>
-        <Text style={styles.prompt}>{currentPrompt}</Text>
-      </Animated.View>
-
-      <View style={styles.orbContainer}>
-        <Animated.View style={[styles.orb, orbAnimatedStyle]}>
-          <TouchableOpacity
-            style={styles.orbButton}
-            onPress={toggleRecording}
-            activeOpacity={0.8}
-          >
-            {isRecording ? (
-              <MicOff color="#121820" size={48} strokeWidth={2} />
-            ) : (
-              <Mic color="#121820" size={48} strokeWidth={2} />
-            )}
-          </TouchableOpacity>
+      <ScrollView 
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View style={[styles.backgroundElements, backgroundAnimatedStyle]}>
+          <Text style={styles.greeting}>Hello, {userName}.</Text>
+          <Text style={styles.prompt}>{currentPrompt}</Text>
         </Animated.View>
-      </View>
 
-      {isRecording && (
-        <View style={styles.recordingIndicator}>
-          <View style={styles.recordingDot} />
-          <Text style={styles.recordingText}>Listening...</Text>
+        <View style={styles.orbContainer}>
+          <Animated.View style={[styles.orb, orbAnimatedStyle]}>
+            <TouchableOpacity
+              style={styles.orbButton}
+              onPress={toggleRecording}
+              activeOpacity={0.8}
+            >
+              {isRecording ? (
+                <MicOff color="#121820" size={48} strokeWidth={2} />
+              ) : (
+                <Mic color="#121820" size={48} strokeWidth={2} />
+              )}
+            </TouchableOpacity>
+          </Animated.View>
         </View>
-      )}
+
+        {isRecording && (
+          <View style={styles.recordingIndicator}>
+            <View style={styles.recordingDot} />
+            <Text style={styles.recordingText}>Listening...</Text>
+          </View>
+        )}
+
+        {/* Suggested Reflections Section - Collapsible */}
+        {!isRecording && journalPrompts.length > 0 && (
+          <View style={styles.promptsSection}>
+            {!promptsExpanded ? (
+              // Collapsed State - Subtle hint
+              <TouchableOpacity 
+                style={styles.promptsCollapsed}
+                onPress={togglePromptsExpansion}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.promptsCollapsedText}>
+                  💡 Explore new topics
+                </Text>
+                <Text style={styles.promptsCollapsedIcon}>↓</Text>
+              </TouchableOpacity>
+            ) : (
+              // Expanded State - Full prompts display
+              <View>
+                <TouchableOpacity 
+                  style={styles.promptsHeader}
+                  onPress={togglePromptsExpansion}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.promptsSectionTitle}>✨ Suggested Reflections</Text>
+                  <Text style={styles.promptsCollapseIcon}>↑</Text>
+                </TouchableOpacity>
+                
+                <Text style={styles.promptsSectionSubtitle}>
+                  Explore new areas of your life journey
+                </Text>
+                
+                {journalPrompts.map((prompt, index) => (
+                  <PromptCard
+                    key={prompt.id}
+                    prompt={prompt}
+                    onPromptPress={handlePromptPress}
+                    onSkip={handlePromptSkip}
+                  />
+                ))}
+                
+                {loadingPrompts && (
+                  <View style={styles.loadingContainer}>
+                    <Text style={styles.loadingText}>Loading personalized prompts...</Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -256,12 +490,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
   backgroundElements: {
-    position: 'absolute',
-    top: height * 0.15,
-    left: 0,
-    right: 0,
     alignItems: 'center',
+    marginTop: 60,
+    marginBottom: 40,
   },
   greeting: {
     fontSize: 28,
@@ -274,11 +514,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     color: '#9CA3AF',
     textAlign: 'center',
+    paddingHorizontal: 20,
   },
   orbContainer: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
+    marginVertical: 40,
+    paddingHorizontal: 10,
   },
   orb: {
     width: 180,
@@ -304,8 +545,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   recordingIndicator: {
-    position: 'absolute',
-    bottom: 120,
+    alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 195, 0, 0.1)',
@@ -314,6 +554,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255, 195, 0, 0.3)',
+    marginTop: 20,
   },
   recordingDot: {
     width: 8,
@@ -324,6 +565,63 @@ const styles = StyleSheet.create({
   },
   recordingText: {
     color: '#F5F5F0',
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+  },
+  promptsSection: {
+    marginTop: 20,
+  },
+  // Collapsed State Styles
+  promptsCollapsed: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 195, 0, 0.05)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 195, 0, 0.1)',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  promptsCollapsedText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#9CA3AF',
+    marginRight: 8,
+  },
+  promptsCollapsedIcon: {
+    fontSize: 14,
+    color: '#9CA3AF',
+  },
+  // Expanded State Styles  
+  promptsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  promptsSectionTitle: {
+    fontSize: 20,
+    fontFamily: 'Inter-Regular',
+    color: '#F5F5F0',
+  },
+  promptsCollapseIcon: {
+    fontSize: 18,
+    color: '#9CA3AF',
+    fontFamily: 'Inter-Regular',
+  },
+  promptsSectionSubtitle: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#9CA3AF',
+    marginBottom: 20,
+  },
+  loadingContainer: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#9CA3AF',
     fontFamily: 'Inter-Regular',
     fontSize: 14,
   },

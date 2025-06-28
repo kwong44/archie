@@ -44,7 +44,7 @@
       "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoeXpzbmFscmhpYnZieGRhYnFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxMzMwMzQsImV4cCI6MjA2NTcwOTAzNH0.p0ashW-IVA2ehKZFoz8ol1m7UJwOL5Z4NmvwHG8oFLs",
       "postHogApiKey": "phc_vDoXW063AwzLdg4SEPaiSc37EkV10VS9R4dTPbNjkx0",
       "postHogHost": "https://us.i.posthog.com",
-      "aiBackendUrl": "$EXPO_PUBLIC_AI_BACKEND_URL",
+      "aiBackendUrl": "http://192.168.1.104:8000",
       "revenueCatApiKey": "$EXPO_PUBLIC_REVENUE_CAT_API_KEY",
       "eas": {
         "projectId": "b8e91b30-9b7b-471b-a7c8-cc10c6cfe7c6"

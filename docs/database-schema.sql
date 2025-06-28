@@ -95,6 +95,19 @@ CREATE TABLE IF NOT EXISTS public.user_achievements (
     CONSTRAINT user_achievements_user_type_key UNIQUE (user_id, achievement_type)
 );
 
+-- Prompt Engagement Table
+-- Tracks user interactions with journal prompts for personalization and analytics
+CREATE TABLE IF NOT EXISTS public.prompt_engagement (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) NOT NULL,
+    prompt_id TEXT NOT NULL,
+    prompt_category TEXT NOT NULL,
+    action TEXT NOT NULL CHECK (action IN ('viewed', 'used', 'skipped')),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    CONSTRAINT prompt_engagement_user_prompt_action_key UNIQUE (user_id, prompt_id, action)
+);
+
 -- RLS (Row Level Security) Policies
 -- These policies ensure users can only access their own data
 
@@ -105,6 +118,7 @@ ALTER TABLE public.user_lexicon ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.journal_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transformation_usage ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_achievements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.prompt_engagement ENABLE ROW LEVEL SECURITY;
 
 -- User Profiles Policies
 CREATE POLICY "Users can view their own profile."
@@ -186,6 +200,15 @@ CREATE POLICY "Users can view their own achievements."
 
 CREATE POLICY "Users can insert their own achievements."
     ON public.user_achievements FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+-- Prompt Engagement Policies
+CREATE POLICY "Users can view their own prompt engagement."
+    ON public.prompt_engagement FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own prompt engagement."
+    ON public.prompt_engagement FOR INSERT
     WITH CHECK (auth.uid() = user_id);
 
 -- Functions for automatic timestamps
@@ -270,6 +293,10 @@ CREATE INDEX IF NOT EXISTS idx_journal_sessions_user_id ON public.journal_sessio
 CREATE INDEX IF NOT EXISTS idx_journal_sessions_created_at ON public.journal_sessions(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_transformation_usage_user_id ON public.transformation_usage(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_achievements_user_id ON public.user_achievements(user_id);
+CREATE INDEX IF NOT EXISTS idx_prompt_engagement_user_id ON public.prompt_engagement(user_id);
+CREATE INDEX IF NOT EXISTS idx_prompt_engagement_created_at ON public.prompt_engagement(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_prompt_engagement_category ON public.prompt_engagement(prompt_category);
+CREATE INDEX IF NOT EXISTS idx_prompt_engagement_action ON public.prompt_engagement(action);
 
 -- Grant necessary permissions
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
@@ -282,4 +309,5 @@ COMMENT ON TABLE public.user_principles IS 'Core principles selected by users du
 COMMENT ON TABLE public.user_lexicon IS 'Personal word transformation pairs (old -> new words)';
 COMMENT ON TABLE public.journal_sessions IS 'Completed reframing sessions with transcripts and AI summaries';
 COMMENT ON TABLE public.transformation_usage IS 'Tracks when specific transformations are applied in sessions';
-COMMENT ON TABLE public.user_achievements IS 'Gamification achievements earned by users'; 
+COMMENT ON TABLE public.user_achievements IS 'Gamification achievements earned by users';
+COMMENT ON TABLE public.prompt_engagement IS 'Tracks user interactions with journal prompts for personalization and analytics'; 

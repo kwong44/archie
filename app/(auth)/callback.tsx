@@ -3,6 +3,8 @@ import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { UserService } from '../../services/userService';
+import { logger } from '../../lib/logger';
 
 /**
  * OAuth Callback Handler
@@ -20,14 +22,15 @@ export default function AuthCallbackScreen() {
   /**
    * Processes OAuth callback parameters and exchanges them for a session
    * Handles success and error cases appropriately
+   * Creates user profiles for new OAuth users
    */
   const handleOAuthCallback = async () => {
-    console.log('🔄 Processing OAuth callback with params:', params);
+    logger.info('Processing OAuth callback', { hasParams: Object.keys(params).length > 0 });
 
     try {
       // Check if we have the necessary OAuth parameters
       if (typeof params.access_token === 'string' && typeof params.refresh_token === 'string') {
-        console.log('✅ OAuth tokens found, setting session');
+        logger.info('OAuth tokens found, setting session');
         
         // Set the session using the tokens from the OAuth callback
         const { data, error } = await supabase.auth.setSession({
@@ -36,31 +39,66 @@ export default function AuthCallbackScreen() {
         });
 
         if (error) {
-          console.error('❌ Error setting OAuth session:', error.message);
+          logger.error('Error setting OAuth session', { error: error.message });
           router.replace('/(auth)/login');
           return;
         }
 
-        if (data.session) {
-          console.log('✅ OAuth session established successfully');
+        if (data.session?.user) {
+          const user = data.session.user;
+          logger.info('OAuth session established successfully', { 
+            userId: user.id,
+            email: user.email 
+          });
+          
           // Check if this is a new user (first time signing in)
-          if (data.session.user?.created_at === data.session.user?.last_sign_in_at) {
-            console.log('🆕 New user detected, redirecting to onboarding');
-            router.replace('/(onboarding)/principles');
+          const isNewUser = user.created_at === user.last_sign_in_at;
+          
+          if (isNewUser) {
+            logger.info('New OAuth user detected, creating profile', { userId: user.id });
+            
+            try {
+              // Check if profile already exists (edge case handling)
+              const existingProfile = await UserService.getCurrentUserProfile();
+              
+              if (!existingProfile) {
+                // Create user profile for new OAuth user
+                await UserService.createUserProfileForOAuth(
+                  user.id,
+                  user.email || '',
+                  user.user_metadata?.full_name || user.user_metadata?.name
+                );
+                
+                logger.info('OAuth user profile created successfully', { userId: user.id });
+              } else {
+                logger.info('OAuth user profile already exists', { userId: user.id });
+              }
+              
+              router.replace('/(onboarding)/principles');
+            } catch (profileError) {
+              logger.error('Failed to create OAuth user profile', { 
+                userId: user.id, 
+                error: profileError 
+              });
+              
+              // Continue to onboarding even if profile creation fails
+              // The profile can be created later during onboarding
+              router.replace('/(onboarding)/principles');
+            }
           } else {
-            console.log('👤 Existing user, redirecting to app');
+            logger.info('Existing OAuth user, redirecting to app', { userId: user.id });
             router.replace('/(tabs)');
           }
         }
       } else if (typeof params.error === 'string') {
-        console.error('❌ OAuth error received:', params.error);
+        logger.error('OAuth error received', { error: params.error });
         router.replace('/(auth)/login');
       } else {
-        console.warn('⚠️ No valid OAuth parameters found');
+        logger.warn('No valid OAuth parameters found', { params });
         router.replace('/(auth)/login');
       }
     } catch (error) {
-      console.error('❌ Unexpected error in OAuth callback:', error);
+      logger.error('Unexpected error in OAuth callback', { error });
       router.replace('/(auth)/login');
     }
   };

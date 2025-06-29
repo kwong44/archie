@@ -15,51 +15,136 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
+import { logger } from '../../lib/logger';
 
 /**
  * SignUpScreen Component
  * Provides user registration through email/password and Google OAuth
  * Simplified authentication flow with only Google and Email options
  * Implements keyboard dismissal functionality for better UX
+ * Creates user profile with full name during registration
  */
 export default function SignUpScreen() {
   // State management for form inputs and loading states
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const router = useRouter();
 
   /**
+   * Creates a user profile record in the user_profiles table
+   * Links the profile to the authenticated user via user_id
+   * @param userId - The UUID of the authenticated user from Supabase Auth
+   * @param name - The user's full name
+   * @param userEmail - The user's email address
+   */
+  const createUserProfile = async (userId: string, name: string, userEmail: string) => {
+    logger.info('Creating user profile', { userId, name, email: userEmail });
+    
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .insert({
+          id: userId, // Primary key matches auth.users.id
+          user_id: userId, // Foreign key reference to auth.users.id
+          full_name: name.trim(),
+          email: userEmail,
+          onboarding_completed: false,
+        });
+
+      if (error) {
+        logger.error('Failed to create user profile', { 
+          userId, 
+          error: error.message,
+          errorCode: error.code 
+        });
+        throw error;
+      }
+
+      logger.info('User profile created successfully', { userId, name });
+    } catch (error) {
+      logger.error('Unexpected error creating user profile', { userId, error });
+      throw error;
+    }
+  };
+
+  /**
    * Handles email/password registration using Supabase Auth
    * Validates inputs and provides user feedback
+   * Creates user profile after successful authentication
    */
   async function signUpWithEmail() {
-    console.log('📝 Attempting email sign-up for user:', email);
+    logger.info('Attempting email sign-up', { email, hasName: !!fullName.trim() });
+    
+    // Input validation
+    if (!fullName.trim()) {
+      Alert.alert('Name Required', 'Please enter your full name.');
+      return;
+    }
+    
+    if (!email.trim()) {
+      Alert.alert('Email Required', 'Please enter your email address.');
+      return;
+    }
+    
+    if (!password.trim()) {
+      Alert.alert('Password Required', 'Please enter a password.');
+      return;
+    }
+
     setLoading(true);
 
     try {
+      // Step 1: Create auth user
       const { data, error } = await supabase.auth.signUp({
-        email: email,
+        email: email.trim(),
         password: password,
       });
 
       if (error) {
-        console.error('❌ Email sign-up error:', error.message);
+        logger.error('Email sign-up auth error', { email, error: error.message });
         Alert.alert('Sign Up Error', error.message);
-      } else if (data.session) {
-        console.log('✅ Email sign-up successful with immediate session');
-        router.replace('/(onboarding)/principles' as any);
+        return;
+      }
+
+      // Step 2: Create user profile if auth was successful
+      if (data.user) {
+        try {
+          await createUserProfile(data.user.id, fullName, email.trim());
+          
+          if (data.session) {
+            logger.info('Email sign-up successful with immediate session');
+            router.replace('/(onboarding)/principles' as any);
+          } else {
+            logger.info('Email verification required, profile created');
+            Alert.alert(
+              'Check your email!', 
+              'We have sent you a confirmation link to complete your registration. Your profile has been created and will be ready when you verify your email.'
+            );
+            router.push('/(auth)/login' as any);
+          }
+        } catch (profileError) {
+          logger.error('Failed to create user profile during signup', { 
+            userId: data.user.id, 
+            error: profileError 
+          });
+          
+          // Clean up auth user if profile creation fails
+          await supabase.auth.signOut();
+          
+          Alert.alert(
+            'Registration Error', 
+            'There was an issue setting up your profile. Please try again.'
+          );
+        }
       } else {
-        console.log('📧 Email verification required');
-        Alert.alert(
-          'Check your email!', 
-          'We have sent you a confirmation link to complete your registration.'
-        );
-        router.push('/(auth)/login' as any);
+        logger.warn('No user data returned from sign-up');
+        Alert.alert('Registration Error', 'No user data received. Please try again.');
       }
     } catch (error) {
-      console.error('❌ Unexpected sign-up error:', error);
+      logger.error('Unexpected sign-up error', { email, error });
       Alert.alert('Error', 'An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
@@ -70,9 +155,10 @@ export default function SignUpScreen() {
    * Handles Google OAuth registration using Supabase Auth
    * Uses expo-web-browser for secure OAuth flow with deep linking
    * Full-width button design with Google branding
+   * OAuth callback automatically creates user profiles with available data
    */
   async function signUpWithGoogle() {
-    console.log('🔵 Initiating Google OAuth sign-up');
+    logger.info('Initiating Google OAuth sign-up');
     setGoogleLoading(true);
     
     try {
@@ -81,7 +167,7 @@ export default function SignUpScreen() {
         path: 'auth/callback',
       });
       
-      console.log('🔗 Using redirect URL:', redirectUrl);
+      logger.info('Using OAuth redirect URL', { redirectUrl });
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -92,24 +178,24 @@ export default function SignUpScreen() {
       });
 
       if (error) {
-        console.error('❌ Google OAuth error:', error.message);
+        logger.error('Google OAuth error', { error: error.message });
         Alert.alert('Google Sign Up Error', error.message);
         return;
       }
 
       if (data.url) {
-        console.log('🌐 Opening OAuth URL in browser');
+        logger.info('Opening OAuth URL in browser');
         const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
         
         if (result.type === 'success') {
-          console.log('✅ OAuth completed successfully');
-          // The callback will be handled by the deep link
+          logger.info('OAuth completed successfully');
+          // The callback will handle profile creation if needed
         } else {
-          console.log('❌ OAuth was cancelled or failed');
+          logger.info('OAuth was cancelled or failed', { resultType: result.type });
         }
       }
     } catch (error) {
-      console.error('❌ Unexpected Google OAuth error:', error);
+      logger.error('Unexpected Google OAuth error', { error });
       Alert.alert('Error', 'Failed to sign up with Google. Please try again.');
     } finally {
       setGoogleLoading(false);
@@ -133,6 +219,19 @@ export default function SignUpScreen() {
         </View>
 
         <View style={styles.inputContainer}>
+          {/* Full Name Input Field */}
+          <TextInput
+            style={styles.input}
+            placeholder="Full Name"
+            placeholderTextColor="#6B7280"
+            value={fullName}
+            onChangeText={setFullName}
+            autoCapitalize="words"
+            autoComplete="name"
+            textContentType="name"
+            editable={!loading && !googleLoading}
+          />
+          
           <TextInput
             style={styles.input}
             placeholder="Email"
@@ -141,8 +240,11 @@ export default function SignUpScreen() {
             onChangeText={setEmail}
             autoCapitalize="none"
             keyboardType="email-address"
+            autoComplete="email"
+            textContentType="emailAddress"
             editable={!loading && !googleLoading}
           />
+          
           <TextInput
             style={styles.input}
             placeholder="Password"
@@ -150,6 +252,8 @@ export default function SignUpScreen() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry
+            autoComplete="new-password"
+            textContentType="newPassword"
             editable={!loading && !googleLoading}
           />
         </View>

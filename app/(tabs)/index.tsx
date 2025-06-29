@@ -18,13 +18,15 @@ import { PromptService, JournalPrompt } from '@/services/promptService';
 import { PromptCard } from '@/components/PromptCard';
 import { logger } from '@/lib/logger';
 import { supabase } from '@/lib/supabase';
+import { UserService } from '@/services/userService';
 
 const { width, height } = Dimensions.get('window');
 
 export default function WorkshopScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
-  const [userName] = useState('Creator'); // In real app, get from user profile
+  const [userName, setUserName] = useState('Creator'); // Real user name from database
+  const [loadingUserName, setLoadingUserName] = useState(true); // Loading state for user name
   const [journalPrompts, setJournalPrompts] = useState<JournalPrompt[]>([]);
   const [loadingPrompts, setLoadingPrompts] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -80,6 +82,34 @@ export default function WorkshopScreen() {
       false
     );
   }, [currentPrompt, userName]);
+
+  /**
+   * Loads the user's display name from their profile
+   * Uses UserService to fetch from user_profiles table with fallback
+   */
+  useEffect(() => {
+    const loadUserDisplayName = async () => {
+      logger.info('Loading user display name');
+      setLoadingUserName(true);
+      
+      try {
+        const displayName = await UserService.getUserDisplayName();
+        setUserName(displayName);
+        
+        logger.info('User display name loaded successfully', { 
+          displayName,
+          isDefault: displayName === 'Creator'
+        });
+      } catch (error) {
+        logger.error('Failed to load user display name, using fallback', { error });
+        // Keep the default 'Creator' name if loading fails
+      } finally {
+        setLoadingUserName(false);
+      }
+    };
+
+    loadUserDisplayName();
+  }, []); // Run once on component mount
 
   /**
    * Fetches current user ID and loads personalized prompts

@@ -17,7 +17,19 @@ const reframeLogger = createContextLogger('ReframeScreen');
 export default function ReframeScreen() {
   const router = useRouter();
   const { session } = useAuth();
-  const { audioUri } = useLocalSearchParams<{ audioUri?: string }>();
+  const { 
+    audioUri, 
+    selectedPrompt: selectedPromptText, 
+    promptCategory, 
+    promptTitle,
+    promptId 
+  } = useLocalSearchParams<{ 
+    audioUri?: string; 
+    selectedPrompt?: string;
+    promptCategory?: string;
+    promptTitle?: string;
+    promptId?: string;
+  }>();
   
   const [transcript, setTranscript] = useState<string>('');
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -283,13 +295,28 @@ export default function ReframeScreen() {
       });
 
       // Call the AI backend to generate personalized summary
-      const summaryResponse = await aiApiClient.generateSummary({
+      const summaryRequest: any = {
         original_text: transcript,
         reframed_text: reframedText,
         transformation_count: appliedTransformations.length,
         // Include user principles from onboarding for more personalized guidance
         user_principles: userPrinciples.map(p => p.principle)
-      });
+      };
+
+      // Include selected prompt context if available for more personalized guidance
+      if (selectedPromptText) {
+        summaryRequest.selected_prompt = selectedPromptText;
+        summaryRequest.prompt_category = promptCategory;
+        summaryRequest.prompt_title = promptTitle;
+        
+        reframeLogger.info('Including selected prompt context in AI summary generation', {
+          promptTitle,
+          promptCategory,
+          promptId
+        });
+      }
+
+      const summaryResponse = await aiApiClient.generateSummary(summaryRequest);
 
       reframeLogger.info('AI summary generated successfully', {
         userId: session.user.id,
@@ -387,7 +414,12 @@ export default function ReframeScreen() {
         >
           <ArrowLeft color="#F5F5F0" size={24} strokeWidth={2} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>The Blueprint</Text>
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>The Blueprint</Text>
+          {promptTitle && (
+            <Text style={styles.headerSubtitle}>✨ {promptTitle}</Text>
+          )}
+        </View>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -515,10 +547,20 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
   },
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
   headerTitle: {
     fontSize: 18,
     fontFamily: 'Inter-SemiBold',
     color: '#F5F5F0',
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#FFC300',
+    marginTop: 2,
   },
   headerSpacer: {
     width: 40,

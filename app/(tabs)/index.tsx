@@ -29,6 +29,7 @@ export default function WorkshopScreen() {
   const [loadingPrompts, setLoadingPrompts] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [promptsExpanded, setPromptsExpanded] = useState(false); // New state for collapsible prompts
+  const [selectedPrompt, setSelectedPrompt] = useState<JournalPrompt | null>(null); // Store selected prompt
   const recording = useRef<Audio.Recording | null>(null);
   const router = useRouter();
   
@@ -130,43 +131,47 @@ export default function WorkshopScreen() {
 
   /**
    * Handles when user selects a prompt to use for journaling
-   * Navigates to recording with the selected prompt
+   * Stores the prompt and automatically starts recording
    */
-  const handlePromptPress = async (selectedPrompt: JournalPrompt) => {
+  const handlePromptPress = async (selectedPromptData: JournalPrompt) => {
     logger.info('User selected prompt', {
-      promptId: selectedPrompt.id,
-      category: selectedPrompt.category,
-      title: selectedPrompt.title
+      promptId: selectedPromptData.id,
+      category: selectedPromptData.category,
+      title: selectedPromptData.title
     });
 
     // Track prompt engagement in Supabase for future personalization
     if (currentUserId) {
       try {
-        await PromptService.trackPromptEngagement(currentUserId, selectedPrompt, 'used');
-        logger.debug('Prompt usage tracked successfully', { promptId: selectedPrompt.id });
+        await PromptService.trackPromptEngagement(currentUserId, selectedPromptData, 'used');
+        logger.debug('Prompt usage tracked successfully', { promptId: selectedPromptData.id });
       } catch (error) {
         logger.error('Failed to track prompt usage', { 
-          promptId: selectedPrompt.id, 
+          promptId: selectedPromptData.id, 
           userId: currentUserId, 
           error 
         });
         
         // Track this error for monitoring but don't stop the UX flow
         analytics.trackError('Failed to track prompt engagement', 'workshop', {
-          metadata: { promptId: selectedPrompt.id, action: 'used' }
+          metadata: { promptId: selectedPromptData.id, action: 'used' }
         });
       }
     }
 
-    // Store selected prompt in router params and navigate to recording
-    router.push({
-      pathname: '/reframe',
-      params: {
-        selectedPrompt: selectedPrompt.prompt,
-        promptCategory: selectedPrompt.category,
-        promptTitle: selectedPrompt.title
-      }
+    // Store the selected prompt and automatically start recording
+    setSelectedPrompt(selectedPromptData);
+    setPromptsExpanded(false); // Collapse prompts to focus on recording
+    
+    logger.info('Auto-starting recording with selected prompt', {
+      promptId: selectedPromptData.id,
+      promptText: selectedPromptData.prompt
     });
+
+    // Auto-start recording with the selected prompt context
+    if (!isRecording) {
+      await startRecording();
+    }
   };
 
   /**
@@ -270,15 +275,23 @@ export default function WorkshopScreen() {
       recording.current = newRecording;
       setIsRecording(true);
 
-      // Track recording start
+      // Track recording start with prompt context
+      const recordingPrompt = selectedPrompt ? selectedPrompt.prompt : currentPrompt;
       analytics.trackJournaling('recording_started', {
         metadata: { 
-          prompt: currentPrompt,
+          prompt: recordingPrompt,
+          promptTitle: selectedPrompt?.title,
+          promptCategory: selectedPrompt?.category,
+          isSelectedPrompt: !!selectedPrompt,
           platform: Platform.OS
         }
       });
       
-      logger.info('Audio recording started', { prompt: currentPrompt });
+      logger.info('Audio recording started', { 
+        prompt: recordingPrompt,
+        selectedPromptId: selectedPrompt?.id,
+        selectedPromptTitle: selectedPrompt?.title
+      });
 
       // Animate to recording state
       backgroundOpacity.value = withTiming(0.3, { duration: 500 });
@@ -343,20 +356,40 @@ export default function WorkshopScreen() {
       setTimeout(() => {
         logger.info('Navigation executing NOW', {
           pathname: '/reframe',
-          audioUri: uri
+          audioUri: uri,
+          hasSelectedPrompt: !!selectedPrompt
         });
         
         try {
+          // Include selected prompt information if available
+          const navigationParams: any = { audioUri: uri };
+          
+          if (selectedPrompt) {
+            navigationParams.selectedPrompt = selectedPrompt.prompt;
+            navigationParams.promptCategory = selectedPrompt.category;
+            navigationParams.promptTitle = selectedPrompt.title;
+            navigationParams.promptId = selectedPrompt.id;
+            
+            logger.info('Including selected prompt in navigation', {
+              promptId: selectedPrompt.id,
+              promptTitle: selectedPrompt.title
+            });
+          }
+          
           router.push({
             pathname: '/reframe',
-            params: { audioUri: uri }
+            params: navigationParams
           });
+          
+          // Reset selected prompt after navigation
+          setSelectedPrompt(null);
           
           // Track successful navigation
           analytics.trackNavigation('reframe', {
             metadata: { 
               fromScreen: 'workshop',
               hasAudioUri: true,
+              hasSelectedPrompt: !!selectedPrompt,
               navigationMethod: 'recording_completion'
             }
           });
@@ -403,7 +436,14 @@ export default function WorkshopScreen() {
       >
         <Animated.View style={[styles.backgroundElements, backgroundAnimatedStyle]}>
           <Text style={styles.greeting}>Hello, {userName}.</Text>
-          <Text style={styles.prompt}>{currentPrompt}</Text>
+          <Text style={styles.prompt}>
+            {selectedPrompt ? selectedPrompt.prompt : currentPrompt}
+          </Text>
+          {selectedPrompt && (
+            <Text style={styles.selectedPromptLabel}>
+              ✨ {selectedPrompt.title}
+            </Text>
+          )}
         </Animated.View>
 
         <View style={styles.orbContainer}>
@@ -423,14 +463,30 @@ export default function WorkshopScreen() {
         </View>
 
         {isRecording && (
-          <View style={styles.recordingIndicator}>
-            <View style={styles.recordingDot} />
-            <Text style={styles.recordingText}>Listening...</Text>
+          <View style={styles.recordingControls}>
+            <View style={styles.recordingIndicator}>
+              <View style={styles.recordingDot} />
+              <Text style={styles.recordingText}>Listening...</Text>
+            </View>
+            {selectedPrompt && (
+              <TouchableOpacity 
+                style={styles.cancelButton}
+                onPress={() => {
+                  stopRecording();
+                  setSelectedPrompt(null);
+                  logger.info('User cancelled recording with selected prompt', {
+                    promptId: selectedPrompt.id
+                  });
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
         {/* Suggested Reflections Section - Collapsible */}
-        {!isRecording && journalPrompts.length > 0 && (
+        {!isRecording && !selectedPrompt && journalPrompts.length > 0 && (
           <View style={styles.promptsSection}>
             {!promptsExpanded ? (
               // Collapsed State - Subtle hint
@@ -516,6 +572,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 20,
   },
+  selectedPromptLabel: {
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+    color: '#FFC300',
+    textAlign: 'center',
+    marginTop: 8,
+  },
   orbContainer: {
     alignItems: 'center',
     marginVertical: 40,
@@ -544,8 +607,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  recordingControls: {
+    alignItems: 'center',
+    marginTop: 20,
+  },
   recordingIndicator: {
-    alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 195, 0, 0.1)',
@@ -554,7 +620,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255, 195, 0, 0.3)',
-    marginTop: 20,
+    marginBottom: 12,
   },
   recordingDot: {
     width: 8,
@@ -565,6 +631,19 @@ const styles = StyleSheet.create({
   },
   recordingText: {
     color: '#F5F5F0',
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+  },
+  cancelButton: {
+    backgroundColor: 'rgba(156, 163, 175, 0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(156, 163, 175, 0.3)',
+  },
+  cancelButtonText: {
+    color: '#9CA3AF',
     fontFamily: 'Inter-Regular',
     fontSize: 14,
   },

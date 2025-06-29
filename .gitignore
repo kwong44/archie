@@ -38,3 +38,6 @@ archie-ai-backend/google-credentials.json
 
 # virtual environment
 .venv/
+
+# marketing assets
+marketing-assets/

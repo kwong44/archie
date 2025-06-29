@@ -24,7 +24,9 @@
         "tabletImage": "./assets/images/appstore.png"
       },
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "This app needs access to your microphone to record audio for your journal entries and personal reflections."
+        "NSMicrophoneUsageDescription": "This app needs access to your microphone to record audio for your journal entries and personal reflections.",
+        "NSCameraUsageDescription": "This app does not use the camera. This permission is required by iOS for certain app frameworks, but camera access is never requested.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -46,7 +48,8 @@
       },
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.archie.app",
       "permissions": [
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
     "web": {
@@ -75,10 +78,11 @@
       "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoeXpzbmFscmhpYnZieGRhYnFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxMzMwMzQsImV4cCI6MjA2NTcwOTAzNH0.p0ashW-IVA2ehKZFoz8ol1m7UJwOL5Z4NmvwHG8oFLs",
       "postHogApiKey": "phc_vDoXW063AwzLdg4SEPaiSc37EkV10VS9R4dTPbNjkx0",
       "postHogHost": "https://us.i.posthog.com",
-      "aiBackendUrl": "http://192.168.1.104:8000",
+      "aiBackendUrl": "$EXPO_PUBLIC_AI_BACKEND_URL",
       "revenueCatApiKey": "$EXPO_PUBLIC_REVENUE_CAT_API_KEY",
+      "router": {},
       "eas": {
-        "projectId": "b8e91b30-9b7b-471b-a7c8-cc10c6cfe7c6"
+        "projectId": "2fa5ea09-ee3b-4740-be0a-56e083256c37"
       }
     }
   }

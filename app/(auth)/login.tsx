@@ -15,6 +15,8 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
+import { logger } from '../../lib/logger';
+import { finishOAuth } from '../../lib/finishOAuth';
 
 /**
  * LoginScreen Component
@@ -71,7 +73,7 @@ export default function LoginScreen() {
     try {
       const redirectUrl = makeRedirectUri({
         scheme: 'archie',
-        path: 'auth/callback',
+        path: 'success',
       });
       
       console.log('🔗 Using redirect URL:', redirectUrl);
@@ -95,10 +97,29 @@ export default function LoginScreen() {
         const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
         
         if (result.type === 'success') {
-          console.log('✅ OAuth completed successfully');
-          // The callback will be handled by the deep link
+          console.log('✅ OAuth completed successfully', { 
+            resultType: result.type,
+            url: result.url 
+          });
+          logger.info('OAuth completed successfully from login screen', { 
+            resultType: result.type,
+            url: result.url 
+          });
+
+          // 👉 Exchange the auth code for a session
+          try {
+            await finishOAuth(result.url!, redirectUrl);
+            logger.info('Session obtained after OAuth exchange');
+          } catch (exchangeError) {
+            console.error('❌ OAuth exchange failed:', exchangeError);
+            Alert.alert('Authentication Error', 'Failed to complete sign in. Please try again.');
+          }
         } else {
-          console.log('❌ OAuth was cancelled or failed');
+          console.log('❌ OAuth was cancelled or failed:', result.type);
+          logger.info('OAuth was cancelled or failed from login screen', { 
+            resultType: result.type,
+            url: (result as any).url 
+          });
         }
       }
     } catch (error) {

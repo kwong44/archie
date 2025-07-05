@@ -9,6 +9,7 @@ import { createContextLogger } from '../lib/logger';
 import { SubscriptionService } from '@/services/subscriptionService';
 import { PostHogProvider } from 'posthog-react-native';
 import Constants from 'expo-constants';
+import * as Linking from 'expo-linking';
 
 // Create a context-specific logger for navigation workflows
 const navLogger = createContextLogger('RootLayout');
@@ -21,6 +22,31 @@ function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
 
+  /**
+   * Deep link handler - logs all incoming URLs for debugging
+   * This helps track OAuth redirects and other deep links
+   */
+  useEffect(() => {
+    // Get the initial URL if app was opened from a deep link
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        navLogger.info('App opened with initial URL', { url });
+      }
+    });
+
+    // Listen for incoming deep links while app is running
+    const subscription = Linking.addEventListener('url', (event) => {
+      navLogger.info('Deep link received', { url: event.url });
+      
+      // Check if this is an OAuth success redirect
+      if (event.url.includes('/success')) {
+        navLogger.info('OAuth success deep link detected', { url: event.url });
+      }
+    });
+
+    return () => subscription?.remove();
+  }, []);
+
   useEffect(() => {
     if (loading) return;
 
@@ -28,15 +54,19 @@ function RootLayoutNav() {
     const inOnboardingGroup = segments[0] === '(onboarding)';
     const inTabsGroup = segments[0] === '(tabs)';
     const inReframeScreen = segments[0] === 'reframe';
+    const onSuccessScreen = segments.join('/').includes('success'); // Check if we're on the success screen
 
     navLogger.info('Navigation state evaluation', {
       hasSession: !!session,
       onboardingCompleted,
       currentGroup: segments[0],
+      currentScreen: segments[1],
       inAuthGroup,
       inOnboardingGroup,
       inTabsGroup,
-      inReframeScreen
+      inReframeScreen,
+      onSuccessScreen,
+      fullSegments: segments
     });
 
     if (!session) {
@@ -45,16 +75,21 @@ function RootLayoutNav() {
         navLogger.info('Redirecting to auth - no session');
         router.replace('/(auth)');
       }
+    } else if (session && onSuccessScreen) {
+      // IMPORTANT: Don't redirect away from success screen during OAuth flow
+      // Let the success screen handle its own navigation after verification
+      navLogger.info('User on success screen with session - allowing success screen to handle navigation');
+      return;
     } else if (session && onboardingCompleted === false) {
       // User is authenticated but hasn't completed onboarding
-      if (!inOnboardingGroup) {
+      if (!inOnboardingGroup && !onSuccessScreen) {
         navLogger.info('Redirecting to onboarding - session exists but onboarding incomplete');
         router.replace('/(onboarding)/principles');
       }
     } else if (session && onboardingCompleted === true) {
       // User is authenticated and has completed onboarding
       // Allow access to reframe screen without redirecting
-      if (!inTabsGroup && !inReframeScreen) {
+      if (!inTabsGroup && !inReframeScreen && !onSuccessScreen) {
         navLogger.info('Redirecting to main app - session exists and onboarding complete');
         router.replace('/(tabs)');
       }

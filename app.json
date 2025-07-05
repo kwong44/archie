@@ -68,8 +68,15 @@
           "microphonePermission": "This app needs access to your microphone to record audio for your journal entries and personal reflections."
         }
       ],
-      "expo-localization"
+      "expo-localization",
+      "expo-updates"
     ],
+    "updates": {
+      "url": "https://u.expo.dev/2fa5ea09-ee3b-4740-be0a-56e083256c37"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "experiments": {
       "typedRoutes": true
     },
@@ -78,7 +85,7 @@
       "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoeXpzbmFscmhpYnZieGRhYnFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxMzMwMzQsImV4cCI6MjA2NTcwOTAzNH0.p0ashW-IVA2ehKZFoz8ol1m7UJwOL5Z4NmvwHG8oFLs",
       "postHogApiKey": "phc_vDoXW063AwzLdg4SEPaiSc37EkV10VS9R4dTPbNjkx0",
       "postHogHost": "https://us.i.posthog.com",
-      "aiBackendUrl": "$EXPO_PUBLIC_AI_BACKEND_URL",
+      "aiBackendUrl": "https://archie-ai-backend-325560983355.us-central1.run.app",
       "revenueCatApiKey": "$EXPO_PUBLIC_REVENUE_CAT_API_KEY",
       "router": {},
       "eas": {

@@ -71,7 +71,10 @@ export default function ReframeScreen() {
     try {
       reframeLogger.info('Starting audio transcription', {
         userId: session.user.id,
-        audioUri: audioUri.substring(0, 50) + '...'
+        audioUri: audioUri.substring(0, 50) + '...',
+        audioUriLength: audioUri.length,
+        fileExtension: audioUri.split('.').pop(),
+        isTestFlight: __DEV__ ? false : true // Production build indicator
       });
 
       // Call our STT service with the audio URI
@@ -92,16 +95,24 @@ export default function ReframeScreen() {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown transcription error';
       
+      // Enhanced error logging for production debugging
       reframeLogger.error('Audio transcription failed', {
         userId: session.user.id,
-        error: errorMessage
+        error: errorMessage,
+        errorType: error instanceof Error ? error.constructor.name : 'UnknownError',
+        audioUri: audioUri.substring(0, 50) + '...',
+        audioUriLength: audioUri.length,
+        fileExtension: audioUri.split('.').pop(),
+        isTestFlight: __DEV__ ? false : true,
+        // Include stack trace if available
+        stackTrace: error instanceof Error ? error.stack?.substring(0, 500) : 'No stack trace'
       });
       
-      setTranscriptionError('Failed to transcribe audio. Please try recording again.');
+      setTranscriptionError(`Transcription failed: ${errorMessage}`);
       
       Alert.alert(
         'Transcription Error',
-        'Unable to process your audio recording. Please try again.',
+        `Unable to process your audio recording.\n\nError: ${errorMessage}\n\nThis information has been logged for debugging.`,
         [
           { text: 'Retry', onPress: () => router.back() },
           { text: 'Use Demo Text', onPress: () => {

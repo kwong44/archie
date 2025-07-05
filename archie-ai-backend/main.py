@@ -74,8 +74,10 @@ app.add_middleware(
         "http://localhost:8081",  # Expo dev server
         "https://*.expo.dev",     # Expo hosted apps
         "exp://",                 # Expo Go
+        # 🔧 PRODUCTION FIX: Allow mobile apps (no credentials needed for JWT auth)
+        "*",                      # Allow all origins for mobile apps
     ],
-    allow_credentials=True,
+    allow_credentials=False,      # 🔧 FIX: Disabled to allow * origins
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )

@@ -61,6 +61,8 @@ export default function WorkshopScreen() {
   const [promptsSectionY, setPromptsSectionY] = useState(0);
   // Indicates that the view has reached prompts area; used to detect upward scroll away
   const [hasReachedPrompts, setHasReachedPrompts] = useState(false);
+  const collapseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [collapseScheduled, setCollapseScheduled] = useState(false);
 
   useEffect(() => {
     // Track screen view for analytics
@@ -322,12 +324,29 @@ export default function WorkshopScreen() {
         setHasReachedPrompts(true);
       }
 
-      // Only auto-collapse if already reached prompts area and user scrolls above
-      if (hasReachedPrompts && offsetY < promptsSectionY - 40) {
-        logger.info('User scrolled above prompts – auto-collapsing');
-        setPromptsExpanded(false);
-        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-        setHasReachedPrompts(false);
+      const collapseThreshold = promptsSectionY - 150;
+
+      if (hasReachedPrompts && offsetY < collapseThreshold && !collapseScheduled) {
+        logger.info('User scrolled above prompts threshold – scheduling collapse');
+        setCollapseScheduled(true);
+
+        // Delay collapse slightly to create smoother UX
+        collapseTimeoutRef.current = setTimeout(() => {
+          logger.info('Executing prompt section collapse');
+          setPromptsExpanded(false);
+          scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+          setHasReachedPrompts(false);
+          setCollapseScheduled(false);
+        }, 300); // 300ms delay for natural feel
+      }
+
+      // If user scrolls back down before timeout, cancel collapse
+      if (collapseScheduled && offsetY >= collapseThreshold) {
+        if (collapseTimeoutRef.current) {
+          clearTimeout(collapseTimeoutRef.current);
+        }
+        setCollapseScheduled(false);
+        logger.debug('Collapse cancelled – user scrolled back into prompts');
       }
     },
     [promptsExpanded, promptsSectionY, hasReachedPrompts]
@@ -503,6 +522,15 @@ export default function WorkshopScreen() {
       opacity: backgroundOpacity.value,
     };
   });
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (collapseTimeoutRef.current) {
+        clearTimeout(collapseTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -781,6 +809,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: 16,
     marginBottom: 10,
   },
   promptsSectionTitle: {

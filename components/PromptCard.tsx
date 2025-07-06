@@ -68,6 +68,24 @@ export const PromptCard: React.FC<PromptCardProps> = ({
   };
 
   /**
+   * Returns a curated Pexels image URL per category for consistent quality
+   * Pexels images are free-to-use and don't require an API key for static links
+   */
+  const getBackgroundImage = (category: PromptCategory): string => {
+    const images: Record<PromptCategory, string> = {
+      [PromptCategory.RELATIONSHIPS]: 'https://images.pexels.com/photos/4101182/pexels-photo-4101182.jpeg?auto=compress&cs=tinysrgb&h=600&w=800',
+      [PromptCategory.WORK_CAREER]: 'https://images.pexels.com/photos/3184297/pexels-photo-3184297.jpeg?auto=compress&cs=tinysrgb&h=600&w=800',
+      [PromptCategory.PERSONAL_GROWTH]: 'https://images.pexels.com/photos/1557238/pexels-photo-1557238.jpeg?auto=compress&cs=tinysrgb&h=600&w=800',
+      [PromptCategory.HEALTH_WELLNESS]: 'https://images.pexels.com/photos/1552102/pexels-photo-1552102.jpeg?auto=compress&cs=tinysrgb&h=600&w=800',
+      [PromptCategory.FEARS_ANXIETIES]: 'https://images.pexels.com/photos/3225517/pexels-photo-3225517.jpeg?auto=compress&cs=tinysrgb&h=600&w=800',
+      [PromptCategory.DREAMS_ASPIRATIONS]: 'https://images.pexels.com/photos/2662116/pexels-photo-2662116.jpeg?auto=compress&cs=tinysrgb&h=600&w=800',
+      [PromptCategory.PAST_EXPERIENCES]: 'https://images.pexels.com/photos/3930128/pexels-photo-3930128.jpeg?auto=compress&cs=tinysrgb&h=600&w=800',
+      [PromptCategory.DAILY_MOMENTS]: 'https://images.pexels.com/photos/2127929/pexels-photo-2127929.jpeg?auto=compress&cs=tinysrgb&h=600&w=800',
+    };
+    return images[category] || 'https://images.pexels.com/photos/3573351/pexels-photo-3573351.jpeg?auto=compress&cs=tinysrgb&h=600&w=800';
+  };
+
+  /**
    * Handles prompt card press - tracks analytics and triggers callback
    */
   const handlePromptPress = () => {
@@ -113,8 +131,7 @@ export const PromptCard: React.FC<PromptCardProps> = ({
 
   const categoryColor = getCategoryColor(prompt.category);
 
-  // Dynamically sourced background image based on category keyword
-  const backgroundImageUri = `https://source.unsplash.com/800x600/?${prompt.category}`;
+  const backgroundImageUri = getBackgroundImage(prompt.category);
 
   return (
     <View style={styles.cardContainer}>

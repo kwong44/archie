@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform, ScrollView, Alert, Image, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Mic, MicOff } from 'lucide-react-native';
@@ -53,6 +53,14 @@ export default function WorkshopScreen() {
     "What needs expression?"
   ];
   const currentPrompt = prompts[Math.floor(Date.now() / (1000 * 60 * 60 * 6)) % prompts.length];
+
+  // ScrollView reference to control programmatic scrolling
+  const scrollViewRef = useRef<ScrollView | null>(null);
+
+  // Y-position of the prompts section within the ScrollView
+  const [promptsSectionY, setPromptsSectionY] = useState(0);
+  // Indicates that the view has reached prompts area; used to detect upward scroll away
+  const [hasReachedPrompts, setHasReachedPrompts] = useState(false);
 
   useEffect(() => {
     // Track screen view for analytics
@@ -265,26 +273,65 @@ export default function WorkshopScreen() {
   };
 
   /**
-   * Toggles the expansion state of the prompts section
-   * Tracks analytics when user explores prompts
+   * Toggles the prompts section and handles smooth scrolling
+   * When expanding, scrolls down to the prompt cards
+   * When collapsing, scrolls back to top of screen
    */
   const togglePromptsExpansion = () => {
     const newExpanded = !promptsExpanded;
     setPromptsExpanded(newExpanded);
-    
-    logger.info('Prompts section toggled', { 
+
+    logger.info('Prompts section toggled', {
       expanded: newExpanded,
-      promptCount: journalPrompts.length 
+      promptCount: journalPrompts.length,
     });
 
-    // Track engagement when user expands to explore prompts
     if (newExpanded) {
+      // Track discovery analytics
       analytics.trackEngagement('feature_discovered', {
         feature: 'suggested_reflections',
-        metadata: { promptCount: journalPrompts.length }
+        metadata: { promptCount: journalPrompts.length },
       });
+
+      // Scroll to the prompts section after small delay to ensure layout calculation
+      setTimeout(() => {
+        if (scrollViewRef.current) {
+          scrollViewRef.current.scrollTo({ y: promptsSectionY, animated: true });
+        }
+      }, 50);
+    } else {
+      // Collapse ‑ scroll back to top and reset flag
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      setHasReachedPrompts(false);
     }
   };
+
+  /**
+   * Handles ScrollView scroll events.
+   * If user scrolls upward past the prompts section while it is expanded,
+   * automatically collapse the section and return to the top.
+   */
+  const handleScroll = useCallback(
+    (event: any) => {
+      if (!promptsExpanded) return;
+
+      const offsetY = event.nativeEvent.contentOffset.y;
+
+      // Mark that prompts area has been reached when scrolling down
+      if (!hasReachedPrompts && offsetY >= promptsSectionY - 40) {
+        setHasReachedPrompts(true);
+      }
+
+      // Only auto-collapse if already reached prompts area and user scrolls above
+      if (hasReachedPrompts && offsetY < promptsSectionY - 40) {
+        logger.info('User scrolled above prompts – auto-collapsing');
+        setPromptsExpanded(false);
+        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+        setHasReachedPrompts(false);
+      }
+    },
+    [promptsExpanded, promptsSectionY, hasReachedPrompts]
+  );
 
   const startRecording = async () => {
     if (!hasPermission) {
@@ -477,6 +524,9 @@ export default function WorkshopScreen() {
       </TouchableOpacity>
       
       <ScrollView 
+        ref={scrollViewRef}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -534,7 +584,14 @@ export default function WorkshopScreen() {
 
         {/* Suggested Reflections Section - Collapsible */}
         {!isRecording && !selectedPrompt && journalPrompts.length > 0 && (
-          <View style={styles.promptsSection}>
+          <View
+            style={styles.promptsSection}
+            onLayout={(e) => {
+              const { y } = e.nativeEvent.layout;
+              setPromptsSectionY(y);
+              logger.debug('Prompts section Y set', { y });
+            }}
+          >
             {!promptsExpanded ? (
               // Collapsed State - Subtle hint
               <TouchableOpacity 
@@ -555,7 +612,7 @@ export default function WorkshopScreen() {
                   onPress={togglePromptsExpansion}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.promptsSectionTitle}>✨ Suggested Reflections</Text>
+                  <Text style={styles.promptsSectionTitle}>Go Deeper</Text>
                   <Text style={styles.promptsCollapseIcon}>↑</Text>
                 </TouchableOpacity>
                 
@@ -727,7 +784,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   promptsSectionTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontFamily: 'Inter-Regular',
     color: '#F5F5F0',
   },

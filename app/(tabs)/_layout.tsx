@@ -54,7 +54,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: 'Dashboard',
+          title: 'Journey',
           tabBarIcon: ({ color, size }) => (
             <TabBarIcon IconComponent={BarChart3} color={color} size={size} />
           ),

@@ -5,16 +5,22 @@
  */
 
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Platform, Dimensions } from 'react-native';
 import { JournalPrompt, PromptCategory } from '@/services/promptService';
 import { useAnalytics } from '@/lib/analytics';
 import { logger } from '@/lib/logger';
+import { BlurView } from 'expo-blur';
+import { Mic, X } from 'lucide-react-native';
 
 interface PromptCardProps {
   prompt: JournalPrompt;
   onPromptPress: (prompt: JournalPrompt) => void;
   onSkip?: (promptId: string) => void;
 }
+
+// Card height ~50% of viewport to mirror InteractionCard proportions
+const { height: screenHeight } = Dimensions.get('window');
+const CARD_HEIGHT = screenHeight * 0.48;
 
 /**
  * PromptCard displays a single journal prompt with category, title, and engaging question
@@ -59,18 +65,6 @@ export const PromptCard: React.FC<PromptCardProps> = ({
       [PromptCategory.DAILY_MOMENTS]: '#6B7280' // Gray
     };
     return categoryColors[category] || '#9CA3AF';
-  };
-
-  /**
-   * Gets depth level indicator
-   */
-  const getDepthIndicator = (level: 'surface' | 'medium' | 'deep'): string => {
-    const indicators: Record<'surface' | 'medium' | 'deep', string> = {
-      'surface': '○',
-      'medium': '◐', 
-      'deep': '●'
-    };
-    return indicators[level] || '○';
   };
 
   /**
@@ -119,158 +113,122 @@ export const PromptCard: React.FC<PromptCardProps> = ({
 
   const categoryColor = getCategoryColor(prompt.category);
 
+  // Dynamically sourced background image based on category keyword
+  const backgroundImageUri = `https://source.unsplash.com/800x600/?${prompt.category}`;
+
   return (
-    <View style={styles.container}>
-      {/* Category and Level Header */}
-      <View style={styles.header}>
-        <View style={[styles.categoryBadge, { backgroundColor: categoryColor + '20' }]}>
-          <Text style={[styles.categoryText, { color: categoryColor }]}>
-            {getCategoryDisplayName(prompt.category)}
-          </Text>
-        </View>
-        <View style={styles.levelContainer}>
-          <Text style={styles.levelIndicator}>
-            {getDepthIndicator(prompt.level as 'surface' | 'medium' | 'deep')}
-          </Text>
-          <Text style={styles.levelText}>{prompt.level}</Text>
-        </View>
-      </View>
+    <View style={styles.cardContainer}>
+      {/* Background layer */}
+      <Image source={{ uri: backgroundImageUri }} style={styles.backgroundImage} />
 
-      {/* Prompt Title */}
-      <Text style={styles.title}>{prompt.title}</Text>
-
-      {/* Prompt Question */}
-      <Text style={styles.prompt}>{prompt.prompt}</Text>
-
-      {/* Action Buttons */}
-      <View style={styles.actions}>
-        <TouchableOpacity 
-          style={styles.useButton}
-          onPress={handlePromptPress}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.useButtonText}>Use This Prompt</Text>
-        </TouchableOpacity>
-        
+      {/* Glass-style overlay with blur */}
+      <BlurView intensity={Platform.OS === 'web' ? 50 : 80} style={styles.blurOverlay}>
+        {/* Skip control (top-right) */}
         {onSkip && (
-          <TouchableOpacity 
-            style={styles.skipButton}
-            onPress={handleSkip}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.skipButtonText}>Skip</Text>
+          <TouchableOpacity style={styles.skipButton} onPress={handleSkip} activeOpacity={0.7}>
+            <X size={18} color="#FFFFFF" />
           </TouchableOpacity>
         )}
-      </View>
 
-      {/* Personalization Indicator */}
-      {prompt.isPersonalized && (
-        <View style={styles.personalizedBadge}>
-          <Text style={styles.personalizedText}>✨ Personalized for you</Text>
+        {/* Category chip (top-left) */}
+        <View style={[styles.categoryChip, { backgroundColor: categoryColor + '33' }]}>
+          <Text style={[styles.chipText, { color: categoryColor }]}> {getCategoryDisplayName(prompt.category)} </Text>
         </View>
-      )}
+
+        {/* Main prompt */}
+        <View style={styles.mainPrompt}>
+          <Text style={styles.greetingText}>{prompt.title}</Text>
+          <Text style={styles.promptText}>{prompt.prompt}</Text>
+        </View>
+
+        {/* Single voice-record action styled like the main yellow orb */}
+        <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={styles.speakButton}
+            onPress={handlePromptPress}
+            activeOpacity={0.8}
+          >
+            <Mic color="#121820" size={32} strokeWidth={2} />
+          </TouchableOpacity>
+        </View>
+      </BlurView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#1F2937', // component-background
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#374151', // border
-    padding: 20,
-    marginBottom: 16,
+  cardContainer: {
+    height: CARD_HEIGHT,
+    marginBottom: 24,
+    borderRadius: 24,
+    overflow: 'hidden',
   },
-  header: {
-    flexDirection: 'row',
+  backgroundImage: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+  },
+  blurOverlay: {
+    flex: 1,
+    padding: 24,
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  categoryBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    flex: 1,
-    marginRight: 12,
-  },
-  categoryText: {
-    fontSize: 12,
-    fontFamily: 'Inter-SemiBold',
-    textAlign: 'center',
-  },
-  levelContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  levelIndicator: {
-    fontSize: 16,
-    color: '#9CA3AF', // text-secondary
-    marginRight: 4,
-  },
-  levelText: {
-    fontSize: 12,
-    fontFamily: 'Inter-Regular',
-    color: '#9CA3AF', // text-secondary
-    textTransform: 'capitalize',
-  },
-  title: {
-    fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
-    color: '#F5F5F0', // text-primary
-    marginBottom: 12,
-  },
-  prompt: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#F5F5F0', // text-primary
-    lineHeight: 24,
-    marginBottom: 20,
-  },
-  actions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  useButton: {
-    backgroundColor: '#FFC300', // accent-primary
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    flex: 1,
-  },
-  useButtonText: {
-    fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-    color: '#121820', // primary-background (contrast text)
-    textAlign: 'center',
   },
   skipButton: {
-    backgroundColor: 'transparent',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#374151', // border
-  },
-  skipButtonText: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    color: '#9CA3AF', // text-secondary
-    textAlign: 'center',
-  },
-  personalizedBadge: {
     position: 'absolute',
-    top: -8,
-    right: 16,
-    backgroundColor: '#10B981', // accent-success
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    top: 24,
+    right: 24,
+    padding: 10,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
-  personalizedText: {
-    fontSize: 10,
+  categoryChip: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  chipText: {
+    fontSize: 12,
     fontFamily: 'Inter-SemiBold',
-    color: '#F5F5F0', // text-primary
+    textTransform: 'capitalize',
+  },
+  mainPrompt: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  greetingText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#FFFFFF',
+    opacity: 0.8,
+    marginBottom: 12,
+  },
+  promptText: {
+    fontSize: 20,
+    fontFamily: 'Inter-Medium',
+    color: '#FFFFFF',
+    lineHeight: 34,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  /**
+   * speakButton visually mirrors the yellow orb in Workshop screen
+   * Provides consistent primary-action affordance across UI
+   */
+  speakButton: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FFC300',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#FFC300',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 6,
   },
 }); 

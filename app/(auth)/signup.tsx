@@ -35,40 +35,29 @@ export default function SignUpScreen() {
   const router = useRouter();
 
   /**
-   * Creates a user profile record in the user_profiles table
-   * Links the profile to the authenticated user via user_id
-   * @param userId - The UUID of the authenticated user from Supabase Auth
-   * @param name - The user's full name
-   * @param userEmail - The user's email address
+   * Updates the auto-generated user profile row (created by DB trigger) once we
+   * have a valid session. The trigger already ensures a row with matching `id`
+   * exists, so we only need to update the name (and any other metadata).
+   *
+   * NOTE: This is only called when `data.session` is present. If the user
+   * requires email confirmation, we skip this step and handle it after the
+   * first login, avoiding RLS errors when no session is active.
+   * (rule: Security First)
    */
-  const createUserProfile = async (userId: string, name: string, userEmail: string) => {
-    logger.info('Creating user profile', { userId, name, email: userEmail });
-    
-    try {
-      const { error } = await supabase
-        .from('user_profiles')
-        .insert({
-          id: userId, // Primary key matches auth.users.id
-          user_id: userId, // Foreign key reference to auth.users.id
-          full_name: name.trim(),
-          email: userEmail,
-          onboarding_completed: false,
-        });
+  const updateUserProfile = async (userId: string, name: string) => {
+    logger.info('Updating user profile name', { userId, name });
 
-      if (error) {
-        logger.error('Failed to create user profile', { 
-          userId, 
-          error: error.message,
-          errorCode: error.code 
-        });
-        throw error;
-      }
+    const { error } = await supabase
+      .from('user_profiles')
+      .update({ full_name: name.trim() })
+      .eq('id', userId);
 
-      logger.info('User profile created successfully', { userId, name });
-    } catch (error) {
-      logger.error('Unexpected error creating user profile', { userId, error });
+    if (error) {
+      logger.error('Failed to update user profile name', { userId, error });
       throw error;
     }
+
+    logger.info('User profile name updated successfully', { userId });
   };
 
   /**
@@ -99,9 +88,14 @@ export default function SignUpScreen() {
 
     try {
       // Step 1: Create auth user
+      const redirectUrl = makeRedirectUri({ scheme: 'archie', path: 'success' });
+
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password: password,
+        options: {
+          emailRedirectTo: redirectUrl,
+        },
       });
 
       if (error) {
@@ -110,35 +104,30 @@ export default function SignUpScreen() {
         return;
       }
 
-      // Step 2: Create user profile if auth was successful
+      // Step 2: Create user profile if auth was successful AND we have a session
       if (data.user) {
-        try {
-          await createUserProfile(data.user.id, fullName, email.trim());
-          
-          if (data.session) {
+        if (data.session) {
+          // ✅ We have a session → RLS allows us to update profile safely
+          try {
+            await updateUserProfile(data.user.id, fullName);
             logger.info('Email sign-up successful with immediate session');
             router.replace('/(onboarding)/principles' as any);
-          } else {
-            logger.info('Email verification required, profile created');
-            Alert.alert(
-              'Check your email!', 
-              'We have sent you a confirmation link to complete your registration. Your profile has been created and will be ready when you verify your email.'
-            );
-            router.push('/(auth)/login' as any);
+          } catch (profileError) {
+            // Non-fatal: The profile row exists; only name update failed
+            logger.error('Failed to update profile during signup', { 
+              userId: data.user.id, 
+              error: profileError 
+            });
+            router.replace('/(onboarding)/principles' as any);
           }
-        } catch (profileError) {
-          logger.error('Failed to create user profile during signup', { 
-            userId: data.user.id, 
-            error: profileError 
-          });
-          
-          // Clean up auth user if profile creation fails
-          await supabase.auth.signOut();
-          
+        } else {
+          // ✉️ Email confirmation required → skip profile update for now
+          logger.info('Email verification required, profile will be completed after confirmation');
           Alert.alert(
-            'Registration Error', 
-            'There was an issue setting up your profile. Please try again.'
+            'Check your email!', 
+            'We have sent you a confirmation link to complete your registration. Once verified, sign in to continue.'
           );
+          router.push('/(auth)/login' as any);
         }
       } else {
         logger.warn('No user data returned from sign-up');

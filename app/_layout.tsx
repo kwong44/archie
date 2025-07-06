@@ -10,6 +10,8 @@ import { SubscriptionService } from '@/services/subscriptionService';
 import { PostHogProvider } from 'posthog-react-native';
 import Constants from 'expo-constants';
 import * as Linking from 'expo-linking';
+import { makeRedirectUri } from 'expo-auth-session';
+import { finishOAuth } from '@/lib/finishOAuth';
 
 // Create a context-specific logger for navigation workflows
 const navLogger = createContextLogger('RootLayout');
@@ -38,9 +40,16 @@ function RootLayoutNav() {
     const subscription = Linking.addEventListener('url', (event) => {
       navLogger.info('Deep link received', { url: event.url });
       
-      // Check if this is an OAuth success redirect
+      // Check if this is an OAuth success redirect containing tokens/code
       if (event.url.includes('/success')) {
         navLogger.info('OAuth success deep link detected', { url: event.url });
+
+        if (event.url.includes('access_token') || event.url.includes('code=')) {
+          const redirectUrl = makeRedirectUri({ scheme: 'archie', path: 'success' });
+          finishOAuth(event.url, redirectUrl)
+            .then(() => navLogger.info('Session established from deep link'))
+            .catch((err) => navLogger.warn('finishOAuth failed in RootLayout', { error: String(err) }));
+        }
       }
     });
 

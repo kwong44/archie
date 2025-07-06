@@ -5,6 +5,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CheckCircle, ArrowRight } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
 import { logger } from '../../lib/logger';
+import * as Linking from 'expo-linking';
+import { makeRedirectUri } from 'expo-auth-session';
+import { finishOAuth } from '@/lib/finishOAuth';
 
 /**
  * SuccessScreen Component
@@ -30,9 +33,24 @@ export default function SuccessScreen() {
       setDebugInfo('Starting OAuth callback verification...');
       
       try {
-        // Wait longer for session to be properly established after OAuth
-        setDebugInfo('Waiting for session to establish...');
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // 1️⃣ Attempt to establish a session from the deep-link parameters.
+        const initialUrl = await Linking.getInitialURL();
+        logger.debug('Initial URL on success screen', { initialUrl });
+
+        if (initialUrl && (initialUrl.includes('access_token') || initialUrl.includes('code='))) {
+          try {
+            const redirectUrl = makeRedirectUri({ scheme: 'archie', path: 'success' });
+            setDebugInfo('Processing tokens from callback URL...');
+            await finishOAuth(initialUrl, redirectUrl);
+            logger.info('Session established via finishOAuth');
+          } catch (tokenErr) {
+            logger.warn('finishOAuth could not establish session', { error: String(tokenErr) });
+          }
+        }
+
+        // 2️⃣ Wait a moment for Supabase client to persist session (esp. SecureStore)
+        setDebugInfo('Waiting for session to persist...');
+        await new Promise(resolve => setTimeout(resolve, 1500));
         
         // Try multiple times to get the session as it might take time to establish
         let session = null;

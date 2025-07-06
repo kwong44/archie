@@ -1,5 +1,5 @@
-import { Tabs } from 'expo-router';
-import { Circle, BookOpen, BarChart3, Settings } from 'lucide-react-native';
+import { Tabs, Link } from 'expo-router';
+import { Circle, BookOpen, FileText, BarChart3, Settings } from 'lucide-react-native';
 import { View, StyleSheet } from 'react-native';
 
 const TabBarIcon = ({ IconComponent, color, size }: { IconComponent: any, color: string, size: number }) => (
@@ -52,23 +52,31 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="entries"
+        options={{
+          title: 'Entries',
+          tabBarIcon: ({ color, size }) => (
+            <TabBarIcon IconComponent={FileText} color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="dashboard"
         options={{
           title: 'Journey',
+          headerShown: true,
+          headerTransparent: true,
+          headerRight: () => (
+            <Link href="/guide" style={{ marginRight: 20 }}>
+              <Settings color="#FFC300" size={24} />
+            </Link>
+          ),
           tabBarIcon: ({ color, size }) => (
             <TabBarIcon IconComponent={BarChart3} color={color} size={size} />
           ),
         }}
       />
-      <Tabs.Screen
-        name="guide"
-        options={{
-          title: 'Guide',
-          tabBarIcon: ({ color, size }) => (
-            <TabBarIcon IconComponent={Settings} color={color} size={size} />
-          ),
-        }}
-      />
+      {/* Guide tab removed from Tab Navigator to free space */}
     </Tabs>
   );
 }

@@ -54,6 +54,7 @@ function RootLayoutNav() {
     const inOnboardingGroup = segments[0] === '(onboarding)';
     const inTabsGroup = segments[0] === '(tabs)';
     const inReframeScreen = segments[0] === 'reframe';
+    const inGuideScreen = segments[0] === 'guide';
     const onSuccessScreen = segments.join('/').includes('success'); // Check if we're on the success screen
 
     navLogger.info('Navigation state evaluation', {
@@ -65,6 +66,7 @@ function RootLayoutNav() {
       inOnboardingGroup,
       inTabsGroup,
       inReframeScreen,
+      inGuideScreen,
       onSuccessScreen,
       fullSegments: segments
     });
@@ -89,7 +91,7 @@ function RootLayoutNav() {
     } else if (session && onboardingCompleted === true) {
       // User is authenticated and has completed onboarding
       // Allow access to reframe screen without redirecting
-      if (!inTabsGroup && !inReframeScreen && !onSuccessScreen) {
+      if (!inTabsGroup && !inReframeScreen && !inGuideScreen && !onSuccessScreen) {
         navLogger.info('Redirecting to main app - session exists and onboarding complete');
         router.replace('/(tabs)');
       }

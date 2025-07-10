@@ -95,6 +95,9 @@ export default function SignUpScreen() {
         password: password,
         options: {
           emailRedirectTo: redirectUrl,
+          data: {
+            full_name: fullName.trim(),
+          },
         },
       });
 

@@ -1,18 +1,6 @@
 ---
-description: 
-globs: 
 alwaysApply: true
 ---
-# Project Rules: Technology Stack & Architecture
-
----
-
-## 1. Overview
-
-This document defines the official technology stack and architectural rules for the "Archie" mobile application. The project is a cross-platform mobile app built with React Native (via Expo) and a Supabase backend, with a specialized Python microservice for handling complex AI operations. Adherence to these rules is mandatory for all development to ensure consistency, scalability, and maintainability.
-
----
-
 ## 2. Core Architectural Principles
 
 *   **BaaS First:** All standard backend operations (database CRUD, authentication, file storage) **MUST** be handled by the Supabase client directly from the frontend. This simplifies the architecture and leverages Supabase's robust, real-time capabilities.
@@ -86,49 +74,15 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 
 ## 5. Specialized AI Backend
 
-*   **Role:** Securely proxying requests to third-party AI APIs.
-*   **Language:** Python 3.11+
-*   **Framework:** FastAPI
-*   **Hosting:** Google Cloud Run (deployed as a Docker container).
-*   **Rule:** All routes **MUST** validate the user's Supabase JWT to ensure only authenticated users can access the AI functionalities. The backend should be stateless, with all state managed by the client or Supabase.
+*   **Role:** Securely proxying requests to third-party AI APIs (ElevenLabs, Google Gemini)
+*   **Implementation (NEW):** Supabase **Edge Functions** written in **TypeScript**  
+    * `transcribe-audio` – Handles Speech-to-Text via ElevenLabs  
+    * `generate-summary` – Generates AI reflections via Gemini
+*   **Runtime:** Supabase Edge Runtime (Deno)
+*   **Hosting:** Runs on Supabase's global edge network – **no more Google Cloud Run**
+*   **Authentication:** Edge Functions automatically validate Supabase JWT tokens – no custom middleware required.
 
-#### Example: Secure FastAPI Route (`main.py`)
-```python
-from fastapi import FastAPI, Depends, HTTPException, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import httpx
-import os
-
-# Assume a function `verify_jwt` exists to validate the Supabase token
-from .auth import verify_jwt 
-
-app = FastAPI()
-
-GOOGLE_AI_API_KEY = os.getenv("GOOGLE_AI_API_KEY")
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
-
-@app.post("/api/summarize")
-async def summarize_text(request: Request, token: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
-    # 1. Verify user's JWT
-    payload = verify_jwt(token.credentials)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    # 2. Get text from request and call Google AI
-    data = await request.json()
-    text_to_summarize = data.get("text")
-
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            f"{GEMINI_API_URL}?key={GOOGLE_AI_API_KEY}",
-            json={
-                "contents": [{"parts":[{"text": f"Summarize this journal entry in an empathetic and encouraging tone: {text_to_summarize}"}]}]
-            }
-        )
-    
-    # 3. Return the result
-    return response.json()
-```
+> **Legacy Note:** The previous Python/FastAPI microservice on Google Cloud Run has been deprecated. Keep it around only for temporary rollback until Edge Functions are fully verified.
 
 ---
 

@@ -157,8 +157,8 @@ export const aiApiClient = {
         languageCode: request.languageCode || 'en-US'
       });
       
-      // Make API request
-      const apiResponse = await fetch(`${AI_BACKEND_URL}/api/speech/transcribe`, {
+      // Make API request to Supabase Edge Function
+      const apiResponse = await fetch(`${AI_BACKEND_URL}/transcribe-audio`, {
         method: 'POST',
         headers: {
           'Authorization': await getAuthHeader(),
@@ -234,7 +234,7 @@ export const aiApiClient = {
     }
     
     try {
-      const response = await fetch(`${AI_BACKEND_URL}/api/ai/summarize`, {
+      const response = await fetch(`${AI_BACKEND_URL}/generate-summary`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -288,56 +288,39 @@ export const aiApiClient = {
   
   /**
    * Get supported audio formats for transcription
-   * Useful for validating files before upload
+   * TODO: Implement as separate Supabase Edge Function if needed
+   * For now, return hardcoded supported formats from ElevenLabs
    * 
    * @returns Promise<any> Supported formats and recommendations
    */
   async getSupportedFormats(): Promise<any> {
-    logger.info('Fetching supported audio formats', {
+    logger.info('Returning hardcoded supported audio formats', {
       context: 'aiApiClient',
       operation: 'getSupportedFormats'
     });
     
-    if (!AI_BACKEND_URL) {
-      throw new Error('AI backend not configured');
-    }
-    
-    try {
-      const response = await fetch(`${AI_BACKEND_URL}/api/speech/formats`, {
-        method: 'GET',
-        headers: {
-          'Authorization': await getAuthHeader(),
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to get formats: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      
-      logger.info('Audio formats fetched successfully', {
-        context: 'aiApiClient',
-        operation: 'getSupportedFormats',
-        formatCount: result.supported_formats?.length || 0
-      });
-      
-      return result;
-      
-    } catch (error) {
-      logger.error('Failed to fetch supported formats', {
-        context: 'aiApiClient',
-        operation: 'getSupportedFormats',
-        error: error instanceof Error ? error.message : String(error)
-      });
-      
-      throw error;
-    }
+    // Return the same formats supported by our Edge Function
+    return {
+      supported_formats: [
+        'audio/wav', 'audio/wave', 'audio/x-wav',
+        'audio/mpeg', 'audio/mp3',
+        'audio/flac',
+        'audio/ogg',
+        'audio/webm',
+        'audio/m4a', 'audio/x-m4a'
+      ],
+      max_file_size_gb: 1,
+      max_duration_seconds: null,
+      models: ['scribe_v1'],
+      supported_languages: [
+        'eng', 'spa', 'fra', 'deu', 'ita', 'por', 'jpn', 'kor', 'cmn'
+      ]
+    };
   },
   
   /**
    * Health check for the AI backend
-   * Useful for monitoring and debugging
+   * Tests connectivity to Supabase Edge Functions
    * 
    * @returns Promise<any> Backend health status
    */
@@ -352,23 +335,25 @@ export const aiApiClient = {
     }
     
     try {
-      const response = await fetch(`${AI_BACKEND_URL}/health`, {
-        method: 'GET',
-        headers: {
-          'Authorization': await getAuthHeader(),
+      // Test both Edge Functions are accessible
+      const transcribeHealthy = await this.testEdgeFunctionHealth('transcribe-audio');
+      const summaryHealthy = await this.testEdgeFunctionHealth('generate-summary');
+      
+      const result = {
+        status: transcribeHealthy && summaryHealthy ? 'healthy' : 'degraded',
+        functions: {
+          'transcribe-audio': transcribeHealthy ? 'active' : 'error',
+          'generate-summary': summaryHealthy ? 'active' : 'error'
         },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Health check failed: ${response.status}`);
-      }
-      
-      const result = await response.json();
+        provider: 'supabase-edge-functions',
+        migrated_from: 'google-cloud-run'
+      };
       
       logger.info('AI backend health check completed', {
         context: 'aiApiClient',
         operation: 'healthCheck',
-        status: result.status
+        status: result.status,
+        functionsStatus: result.functions
       });
       
       return result;
@@ -380,129 +365,72 @@ export const aiApiClient = {
         error: error instanceof Error ? error.message : String(error)
       });
       
-      throw error;
+      return {
+        status: 'error',
+        error: error instanceof Error ? error.message : String(error),
+        provider: 'supabase-edge-functions'
+      };
+    }
+  },
+
+  /**
+   * Test individual Edge Function health
+   * Makes a lightweight request to check if function is responding
+   */
+  async testEdgeFunctionHealth(functionName: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${AI_BACKEND_URL}/${functionName}`, {
+        method: 'OPTIONS', // CORS preflight - should always respond quickly
+        headers: {
+          'Authorization': await getAuthHeader(),
+        },
+      });
+      
+      // OPTIONS should return 200 for healthy functions
+      return response.status === 200;
+      
+    } catch (error) {
+      logger.warn(`Edge Function ${functionName} health check failed`, {
+        context: 'aiApiClient',
+        function: functionName,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return false;
     }
   },
 
   /**
    * Convert text to speech using ElevenLabs TTS API (Phase 2)
+   * TODO: Implement as Supabase Edge Function when needed
    * For AI follow-up questions and guidance
    * 
    * @param request TTSRequest with text and optional voice_id
    * @returns Promise<TTSResponse> Base64-encoded audio data
    */
   async synthesizeText(request: TTSRequest): Promise<TTSResponse> {
-    const startTime = Date.now();
-    
-    logger.info('TTS synthesis request initiated', {
+    // TODO: Implement TTS Edge Function when Phase 2 features are needed
+    logger.info('TTS synthesis requested but not yet implemented', {
       context: 'aiApiClient',
       operation: 'synthesizeText',
       textLength: request.text.length,
       voiceId: request.voice_id || 'default'
     });
     
-    if (!AI_BACKEND_URL) {
-      throw new Error('AI backend not configured');
-    }
-    
-    try {
-      const response = await fetch(`${AI_BACKEND_URL}/api/speech/synthesize`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': await getAuthHeader(),
-        },
-        body: JSON.stringify(request),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        logger.error('TTS synthesis API request failed', {
-          context: 'aiApiClient',
-          operation: 'synthesizeText',
-          status: response.status,
-          statusText: response.statusText,
-          error: errorData
-        });
-        
-        throw new Error(
-          errorData.detail || `TTS synthesis failed: ${response.status}`
-        );
-      }
-      
-      const result: TTSResponse = await response.json();
-      const requestTime = Date.now() - startTime;
-      
-      logger.info('TTS synthesis completed successfully', {
-        context: 'aiApiClient',
-        operation: 'synthesizeText',
-        audioSizeBytes: result.audio_base64.length,
-        voiceId: result.voice_id,
-        processingTimeMs: result.processing_time_ms,
-        totalRequestTimeMs: requestTime
-      });
-      
-      return result;
-      
-    } catch (error) {
-      const requestTime = Date.now() - startTime;
-      
-      logger.error('TTS synthesis request failed', {
-        context: 'aiApiClient',
-        operation: 'synthesizeText',
-        error: error instanceof Error ? error.message : String(error),
-        totalRequestTimeMs: requestTime
-      });
-      
-      throw error;
-    }
+    throw new Error('TTS functionality not yet migrated to Supabase Edge Functions. This will be implemented in Phase 2.');
   },
 
   /**
    * Get available voices for TTS synthesis (Phase 2)
+   * TODO: Implement as Supabase Edge Function when needed
    * 
    * @returns Promise<any> Available voices and their details
    */
   async getAvailableVoices(): Promise<any> {
-    logger.info('Fetching available TTS voices', {
+    logger.info('TTS voices requested but not yet implemented', {
       context: 'aiApiClient',
       operation: 'getAvailableVoices'
     });
     
-    if (!AI_BACKEND_URL) {
-      throw new Error('AI backend not configured');
-    }
-    
-    try {
-      const response = await fetch(`${AI_BACKEND_URL}/api/speech/voices`, {
-        method: 'GET',
-        headers: {
-          'Authorization': await getAuthHeader(),
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to get voices: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      
-      logger.info('TTS voices fetched successfully', {
-        context: 'aiApiClient',
-        operation: 'getAvailableVoices',
-        voiceCount: result.voices?.length || 0
-      });
-      
-      return result;
-      
-    } catch (error) {
-      logger.error('Failed to fetch TTS voices', {
-        context: 'aiApiClient',
-        operation: 'getAvailableVoices',
-        error: error instanceof Error ? error.message : String(error)
-      });
-      
-      throw error;
-    }
+    throw new Error('TTS voice listing not yet migrated to Supabase Edge Functions. This will be implemented in Phase 2.');
   }
 }; 

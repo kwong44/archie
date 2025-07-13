@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/context/AuthContext';
 import { SessionService, JournalSession } from '@/services/sessionService';
 import { logger } from '@/lib/logger';
@@ -114,25 +115,14 @@ const EntriesScreen: React.FC = () => {
   };
 
   /**
-   * Format date for display
+   * Format date for display in the large format
    */
-  const formatDate = (dateString: string): string => {
+  const formatCardDate = (dateString: string): { month: string; day: string } => {
     const date = new Date(dateString);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    if (date.toDateString() === today.toDateString()) {
-      return 'Today';
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      return 'Yesterday';
-    } else {
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric',
-        year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined 
-      });
-    }
+    return {
+      month: date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
+      day: date.toLocaleDateString('en-US', { day: '2-digit' }),
+    };
   };
 
   /**
@@ -152,33 +142,37 @@ const EntriesScreen: React.FC = () => {
   /**
    * Render individual entry item
    */
-  const renderEntryItem = ({ item }: { item: JournalSession }) => (
-    <TouchableOpacity
-      style={styles.entryCard}
-      onPress={() => handleEntryPress(item)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.entryHeader}>
-        <Text style={styles.entryDate}>{formatDate(item.created_at)}</Text>
-        <View style={styles.entryActions}>
-          <Ionicons name="chevron-forward" size={20} color="#FFC300" />
+  const renderEntryItem = ({ item }: { item: JournalSession }) => {
+    const { month, day } = formatCardDate(item.created_at);
+
+    return (
+      <TouchableOpacity
+        style={styles.entryCard}
+        onPress={() => handleEntryPress(item)}
+        activeOpacity={0.8}
+      >
+        <View style={styles.entryHeader}>
+          <View style={styles.entryInfo}>
+            <Text style={styles.entryPreview}>{getEntryPreview(item)}</Text>
+            <Text style={styles.statText}>
+              {item.transformations_applied?.length || 0} transformations
+            </Text>
+          </View>
+          <View style={styles.dateContainer}>
+            <Text style={styles.monthText}>{month}</Text>
+            <Text style={styles.dayText}>{day}</Text>
+          </View>
         </View>
-      </View>
-      
-      <Text style={styles.entryPreview}>{getEntryPreview(item)}</Text>
-      
-      <View style={styles.entryFooter}>
-        <View style={styles.entryStats}>
-          <Text style={styles.statText}>
-            {item.transformations_applied?.length || 0} transformations
-          </Text>
-          {item.mood_after && (
-            <Text style={styles.moodText}>Mood: {item.mood_after}</Text>
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
+
+        <LinearGradient
+          colors={['#FFC300', '#4A90E2', '#10B981']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.gradient}
+        />
+      </TouchableOpacity>
+    );
+  };
 
   /**
    * Render empty state
@@ -192,8 +186,6 @@ const EntriesScreen: React.FC = () => {
       </Text>
     </View>
   );
-
-
 
   // Show loading state
   if (loading && !refreshing) {
@@ -232,8 +224,6 @@ const EntriesScreen: React.FC = () => {
         contentContainerStyle={entries.length === 0 ? styles.emptyContainer : styles.listContainer}
         showsVerticalScrollIndicator={false}
       />
-
-
     </SafeAreaView>
   );
 };
@@ -274,55 +264,51 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   entryCard: {
-    backgroundColor: '#1F2937',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#374151',
+    borderRadius: 24,
+    marginBottom: 50,
+    
   },
   entryHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    alignItems: 'flex-start',
+    marginBottom: 16,
   },
-  entryDate: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 14,
-    color: '#FFC300',
+  entryInfo: {
+    flex: 1,
+    marginRight: 16,
   },
-  entryActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-
   entryPreview: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 16,
+    fontFamily: 'Inter',
+    fontSize: 13,
     color: '#F5F5F0',
-    lineHeight: 24,
-    marginBottom: 12,
+    lineHeight: 18,
+    marginBottom: 8,
   },
-  entryFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  dateContainer: {
     alignItems: 'center',
   },
-  entryStats: {
-    flexDirection: 'row',
-    gap: 16,
+  monthText: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 14,
+    color: '#9CA3AF',
+    textTransform: 'uppercase',
+  },
+  dayText: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 32,
+    color: '#F5F5F0',
+    lineHeight: 36,
   },
   statText: {
     fontFamily: 'Inter-Regular',
     fontSize: 14,
     color: '#9CA3AF',
   },
-  moodText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#10B981',
+  gradient: {
+    height: 300,
+    width: '100%',
+    borderRadius: 16,
   },
   emptyState: {
     alignItems: 'center',

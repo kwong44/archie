@@ -284,10 +284,10 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   title: {
-    fontSize: 32,
+    fontSize: 24,
     fontFamily: 'Inter-Bold',
     color: '#F5F5F0',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   subtitle: {
     fontSize: 16,

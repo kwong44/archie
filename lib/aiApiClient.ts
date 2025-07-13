@@ -77,6 +77,27 @@ export interface AISummaryResponse {
 }
 
 /**
+ * Journal Entry Analysis API Request Types
+ */
+export interface AnalyzeEntryRequest {
+  journal_session_id: string;
+}
+
+export interface AnalyzeEntryResponse {
+  entry_breakdown: string;
+  mood: string[];
+  people: string[];
+  identified_themes: string[];
+  actionable_insight: string;
+  processing_time_ms: number;
+  lexicon_words_identified: Array<{
+    old: string;
+    new: string;
+    context?: string;
+  }>;
+}
+
+/**
  * Text-to-Speech API Request Types (Phase 2)
  */
 export interface TTSRequest {
@@ -285,6 +306,81 @@ export const aiApiClient = {
       throw error;
     }
   },
+
+  /**
+   * Analyze a specific journal entry using AI
+   * Provides comprehensive analysis including mood, themes, and actionable insights
+   * 
+   * @param request AnalyzeEntryRequest with journal session ID
+   * @returns Promise<AnalyzeEntryResponse> Detailed AI analysis of the entry
+   */
+  async analyzeEntry(request: AnalyzeEntryRequest): Promise<AnalyzeEntryResponse> {
+    const startTime = Date.now();
+    
+    logger.info('Journal entry analysis request initiated', {
+      context: 'aiApiClient',
+      operation: 'analyzeEntry',
+      sessionId: request.journal_session_id
+    });
+    
+    if (!AI_BACKEND_URL) {
+      throw new Error('AI backend not configured');
+    }
+    
+    try {
+      const response = await fetch(`${AI_BACKEND_URL}/analyze-entry`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': await getAuthHeader(),
+        },
+        body: JSON.stringify(request),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        logger.error('Journal entry analysis API request failed', {
+          context: 'aiApiClient',
+          operation: 'analyzeEntry',
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
+        
+        throw new Error(
+          errorData.error || `Entry analysis failed: ${response.status}`
+        );
+      }
+      
+      const result: AnalyzeEntryResponse = await response.json();
+      const requestTime = Date.now() - startTime;
+      
+      logger.info('Journal entry analysis completed successfully', {
+        context: 'aiApiClient',
+        operation: 'analyzeEntry',
+        sessionId: request.journal_session_id,
+        moodCount: result.mood.length,
+        themesCount: result.identified_themes.length,
+        lexiconWordsFound: result.lexicon_words_identified.length,
+        processingTimeMs: result.processing_time_ms,
+        totalRequestTimeMs: requestTime
+      });
+      
+      return result;
+      
+    } catch (error) {
+      const requestTime = Date.now() - startTime;
+      
+      logger.error('Journal entry analysis request failed', {
+        context: 'aiApiClient',
+        operation: 'analyzeEntry',
+        error: error instanceof Error ? error.message : String(error),
+        totalRequestTimeMs: requestTime
+      });
+      
+      throw error;
+    }
+  },
   
   /**
    * Get supported audio formats for transcription
@@ -335,15 +431,17 @@ export const aiApiClient = {
     }
     
     try {
-      // Test both Edge Functions are accessible
+      // Test Edge Functions are accessible
       const transcribeHealthy = await this.testEdgeFunctionHealth('transcribe-audio');
       const summaryHealthy = await this.testEdgeFunctionHealth('generate-summary');
+      const analyzeHealthy = await this.testEdgeFunctionHealth('analyze-entry');
       
       const result = {
-        status: transcribeHealthy && summaryHealthy ? 'healthy' : 'degraded',
+        status: transcribeHealthy && summaryHealthy && analyzeHealthy ? 'healthy' : 'degraded',
         functions: {
           'transcribe-audio': transcribeHealthy ? 'active' : 'error',
-          'generate-summary': summaryHealthy ? 'active' : 'error'
+          'generate-summary': summaryHealthy ? 'active' : 'error',
+          'analyze-entry': analyzeHealthy ? 'active' : 'error'
         },
         provider: 'supabase-edge-functions',
         migrated_from: 'google-cloud-run'

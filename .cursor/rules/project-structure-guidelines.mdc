@@ -8,6 +8,7 @@ alwaysApply: true
 .
 ├── AI_BACKEND_SETUP.md
 ├── EAS_UPDATE_WORKFLOW.md
+├── EDGE_FUNCTIONS_MIGRATION.md
 ├── ELEVENLABS_MIGRATION_STATUS.md
 ├── PROMPT_SKIP_ERROR_FIXED.md
 ├── README.md
@@ -28,45 +29,15 @@ alwaysApply: true
 │   ├── (tabs)
 │   │   ├── _layout.tsx
 │   │   ├── dashboard.tsx
-│   │   ├── guide.tsx
+│   │   ├── entries.tsx
 │   │   ├── index.tsx
 │   │   └── lexicon.tsx
 │   ├── +not-found.tsx
 │   ├── _layout.tsx
+│   ├── guide.tsx
 │   ├── paywall.tsx
 │   └── reframe.tsx
 ├── app.json
-├── archie-ai-backend
-│   ├── Dockerfile
-│   ├── README.md
-│   ├── __pycache__
-│   │   ├── main.cpython-311.pyc
-│   │   └── main.cpython-313.pyc
-│   ├── app
-│   │   ├── __init__.py
-│   │   ├── __pycache__
-│   │   │   ├── __init__.cpython-311.pyc
-│   │   │   ├── __init__.cpython-313.pyc
-│   │   │   ├── auth.cpython-311.pyc
-│   │   │   ├── auth.cpython-313.pyc
-│   │   │   ├── logger.cpython-311.pyc
-│   │   │   ├── logger.cpython-313.pyc
-│   │   │   └── models.cpython-313.pyc
-│   │   ├── auth.py
-│   │   ├── logger.py
-│   │   ├── models.py
-│   │   └── routers
-│   │       ├── __init__.py
-│   │       ├── __pycache__
-│   │       ├── ai_summary.py
-│   │       ├── speech.py
-│   │       └── tts.py
-│   ├── env.example
-│   ├── google-credentials.json
-│   ├── main.py
-│   ├── requirements.txt
-│   ├── test_elevenlabs.py
-│   └── test_enhanced_summary.py
 ├── components
 │   ├── AddWordPairModal.tsx
 │   └── PromptCard.tsx
@@ -99,6 +70,9 @@ alwaysApply: true
 │   └── quick-start-checklist.md
 ├── package-lock.json
 ├── package.json
+├── screens
+│   ├── GuideScreen.styles.ts
+│   └── GuideScreen.tsx
 ├── services
 │   ├── achievementsService.ts
 │   ├── dashboardService.ts
@@ -109,9 +83,12 @@ alwaysApply: true
 │   ├── sessionService.ts
 │   ├── subscriptionService.ts
 │   └── userService.ts
+├── supabase
+│   └── functions
 ├── test-assets
 │   ├── test-journal.aiff
 │   └── test-journal.m4a
+├── test-edge-functions.js
 └── tsconfig.json
 
-20 directories, 88 files
+17 directories, 68 files

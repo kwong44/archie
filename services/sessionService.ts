@@ -16,6 +16,7 @@ export interface JournalSession {
   original_transcript: string;
   reframed_text?: string;
   ai_summary?: string;
+  description?: string; // Short, cool description for entry cards
   audio_url?: string;
   mood_before?: string;
   mood_after?: string;
@@ -36,6 +37,7 @@ export interface CreateSessionData {
   original_transcript: string;
   reframed_text?: string;
   ai_summary?: string;
+  description?: string; // Short, cool description for entry cards
   audio_url?: string;
   mood_before?: string;
   mood_after?: string;
@@ -70,7 +72,8 @@ export class SessionService {
       userId,
       transcriptLength: sessionData.original_transcript.length,
       transformationsCount: sessionData.transformations_applied.length,
-      hasSummary: !!sessionData.ai_summary
+      hasSummary: !!sessionData.ai_summary,
+      hasDescription: !!sessionData.description
     });
 
     try {
@@ -82,6 +85,7 @@ export class SessionService {
           original_transcript: sessionData.original_transcript,
           reframed_text: sessionData.reframed_text,
           ai_summary: sessionData.ai_summary,
+          description: sessionData.description,
           audio_url: sessionData.audio_url,
           mood_before: sessionData.mood_before,
           mood_after: sessionData.mood_after,
@@ -366,6 +370,79 @@ export class SessionService {
       sessionLogger.error('Error fetching user sessions', {
         userId,
         error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get a specific journal session by ID
+   * Ensures the session belongs to the specified user (security check)
+   * 
+   * @param sessionId - The session ID to fetch
+   * @param userId - The user's ID (for security validation)
+   * @returns Promise<JournalSession> The journal session
+   * @throws Error if session not found or access denied
+   */
+  static async getSessionById(
+    sessionId: string,
+    userId: string
+  ): Promise<JournalSession> {
+    sessionLogger.info('Fetching session by ID', { 
+      sessionId,
+      userId,
+      operation: 'getSessionById'
+    });
+
+    try {
+      const { data, error } = await supabase
+        .from('journal_sessions')
+        .select('*')
+        .eq('id', sessionId)
+        .eq('user_id', userId) // Security check: ensure user owns this session
+        .single();
+
+      if (error) {
+        sessionLogger.error('Failed to fetch session by ID', {
+          sessionId,
+          userId,
+          error: error.message,
+          operation: 'getSessionById'
+        });
+        
+        if (error.code === 'PGRST116') {
+          throw new Error('Session not found or access denied');
+        }
+        
+        throw new Error(`Failed to fetch session: ${error.message}`);
+      }
+
+      if (!data) {
+        sessionLogger.warn('No session found with ID', {
+          sessionId,
+          userId,
+          operation: 'getSessionById'
+        });
+        throw new Error('Session not found or access denied');
+      }
+
+      sessionLogger.info('Session fetched successfully', {
+        sessionId,
+        userId,
+        hasTranscript: !!data.original_transcript,
+        hasSummary: !!data.ai_summary,
+        hasDescription: !!data.description,
+        operation: 'getSessionById'
+      });
+
+      return data;
+
+    } catch (error) {
+      sessionLogger.error('Unexpected error fetching session by ID', {
+        sessionId,
+        userId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        operation: 'getSessionById'
       });
       throw error;
     }

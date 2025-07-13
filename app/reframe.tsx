@@ -42,6 +42,7 @@ export default function ReframeScreen() {
   const [appliedTransformations, setAppliedTransformations] = useState<TransformationApplied[]>([]);
   const [saving, setSaving] = useState(false);
   const [aiSummary, setAiSummary] = useState<string>('');
+  const [aiDescription, setAiDescription] = useState<string>('');
   const [generatingSummary, setGeneratingSummary] = useState(false);
 
   /**
@@ -199,15 +200,36 @@ export default function ReframeScreen() {
       if (transcript && !generatingSummary) {
         setGeneratingSummary(true);
         try {
-          const summary = await generateSummary();
-          setAiSummary(summary);
+          const aiResponse = await generateSummaryResponse();
+          
+          // Debug logging to check what we received
+          reframeLogger.info('AI response received in useEffect', {
+            userId: session?.user?.id,
+            responseType: typeof aiResponse,
+            hasSummary: !!aiResponse.summary,
+            hasDescription: !!aiResponse.description,
+            summaryType: typeof aiResponse.summary,
+            descriptionType: typeof aiResponse.description,
+            summaryPreview: aiResponse.summary?.substring(0, 50),
+            descriptionPreview: aiResponse.description?.substring(0, 30)
+          });
+          
+          setAiSummary(aiResponse.summary);
+          setAiDescription(aiResponse.description);
+          
+          reframeLogger.info('AI summary and description set successfully', {
+            userId: session?.user?.id,
+            summaryLength: aiResponse.summary.length,
+            descriptionLength: aiResponse.description.length
+          });
         } catch (error) {
           reframeLogger.error('Failed to generate summary in useEffect', {
             userId: session?.user?.id,
             error: error instanceof Error ? error.message : 'Unknown error'
           });
-          // Set fallback summary on error
+          // Set fallback summary and description on error
           setAiSummary('Your practice of reframing language is a powerful step toward conscious self-authorship. Each transformation you make strengthens your ability to choose empowering perspectives.');
+          setAiDescription('Mindful language transformation session');
         } finally {
           setGeneratingSummary(false);
         }
@@ -285,27 +307,30 @@ export default function ReframeScreen() {
   };
 
   /**
-   * Generates an AI-powered encouraging summary using Gemini API
-   * Compares original transcript with reframed text to provide personalized guidance
+   * Generates AI summary and description response from the backend
+   * Returns the full response object with both summary and description
    * 
-   * @returns Promise<string> AI-generated encouraging summary
+   * @returns Promise<{summary: string, description: string}> AI-generated response
    */
-  const generateSummary = async (): Promise<string> => {
+  const generateSummaryResponse = async (): Promise<{summary: string, description: string}> => {
     if (!session?.user) {
-      return 'Complete your session to receive personalized guidance.';
+      return {
+        summary: 'Complete your session to receive personalized guidance.',
+        description: 'Incomplete session'
+      };
     }
 
     try {
       const reframedText = getDisplayText();
       
-      reframeLogger.info('Generating AI summary', {
+      reframeLogger.info('Generating AI summary and description', {
         userId: session.user.id,
         originalTextLength: transcript.length,
         reframedTextLength: reframedText.length,
         transformationsCount: appliedTransformations.length
       });
 
-      // Call the AI backend to generate personalized summary
+      // Call the AI backend to generate personalized summary and description
       const summaryRequest: any = {
         original_text: transcript,
         reframed_text: reframedText,
@@ -329,24 +354,54 @@ export default function ReframeScreen() {
 
       const summaryResponse = await aiApiClient.generateSummary(summaryRequest);
 
-      reframeLogger.info('AI summary generated successfully', {
+      // Debug the raw API response
+      reframeLogger.info('Raw API response received', {
+        userId: session.user.id,
+        responseType: typeof summaryResponse,
+        responseKeys: Object.keys(summaryResponse),
+        hasSummary: !!summaryResponse.summary,
+        hasDescription: !!summaryResponse.description,
+        summaryType: typeof summaryResponse.summary,
+        descriptionType: typeof summaryResponse.description,
+        fullResponse: JSON.stringify(summaryResponse).substring(0, 200)
+      });
+
+      reframeLogger.info('AI summary and description generated successfully', {
         userId: session.user.id,
         summaryLength: summaryResponse.summary.length,
+        descriptionLength: summaryResponse.description.length,
         tone: summaryResponse.tone,
         processingTime: summaryResponse.processing_time_ms
       });
 
-      return summaryResponse.summary;
+      return {
+        summary: summaryResponse.summary,
+        description: summaryResponse.description
+      };
 
     } catch (error) {
-      reframeLogger.error('Failed to generate AI summary', {
+      reframeLogger.error('Failed to generate AI summary and description', {
         userId: session.user.id,
         error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       // Fallback to encouraging generic message if AI fails
-      return 'Your practice of reframing language is a powerful step toward conscious self-authorship. Each transformation you make strengthens your ability to choose empowering perspectives. Keep building this muscle of mindful language.';
+      return {
+        summary: 'Your practice of reframing language is a powerful step toward conscious self-authorship. Each transformation you make strengthens your ability to choose empowering perspectives. Keep building this muscle of mindful language.',
+        description: 'Mindful language transformation session'
+      };
     }
+  };
+
+  /**
+   * Generates an AI-powered encouraging summary using Gemini API
+   * Compares original transcript with reframed text to provide personalized guidance
+   * 
+   * @returns Promise<string> AI-generated encouraging summary
+   */
+  const generateSummary = async (): Promise<string> => {
+    const response = await generateSummaryResponse();
+    return response.summary;
   };
 
   /**
@@ -369,17 +424,39 @@ export default function ReframeScreen() {
     try {
       const reframedText = getDisplayText();
       
-      // Use the pre-generated AI summary, or generate one if not available
+      // Use the pre-generated AI summary and description, or generate new ones if not available
       let finalAiSummary = aiSummary;
-      if (!finalAiSummary) {
-        reframeLogger.info('No pre-generated summary available, generating new one');
-        finalAiSummary = await generateSummary();
+      let finalAiDescription = aiDescription;
+      
+      if (!finalAiSummary || !finalAiDescription) {
+        reframeLogger.info('No pre-generated summary/description available, generating new ones');
+        const aiResponse = await generateSummaryResponse();
+        
+        // Debug logging for save session
+        reframeLogger.info('AI response received in handleSaveSession', {
+          userId: session.user.id,
+          responseType: typeof aiResponse,
+          hasSummary: !!aiResponse.summary,
+          hasDescription: !!aiResponse.description,
+          summaryPreview: aiResponse.summary?.substring(0, 50),
+          descriptionPreview: aiResponse.description?.substring(0, 30)
+        });
+        
+        finalAiSummary = aiResponse.summary;
+        finalAiDescription = aiResponse.description;
       }
+
+      reframeLogger.info('Saving session with summary and description', {
+        userId: session.user.id,
+        summaryLength: finalAiSummary.length,
+        descriptionLength: finalAiDescription.length
+      });
 
       await SessionService.createSession(session.user.id, {
         original_transcript: transcript,
         reframed_text: reframedText,
         ai_summary: finalAiSummary,
+        description: finalAiDescription, // Include the description field
         transformations_applied: appliedTransformations,
         session_duration_seconds: 0, // TODO: Track actual duration
       });

@@ -72,6 +72,7 @@ export interface AISummaryRequest {
 
 export interface AISummaryResponse {
   summary: string;
+  description: string; // Short, cool description for entry cards (1-2 sentences)
   tone: string;
   processing_time_ms: number;
 }
@@ -286,6 +287,7 @@ export const aiApiClient = {
         context: 'aiApiClient',
         operation: 'generateSummary',
         summaryLength: result.summary.length,
+        descriptionLength: result.description.length,
         tone: result.tone,
         processingTimeMs: result.processing_time_ms,
         totalRequestTimeMs: requestTime

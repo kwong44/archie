@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
@@ -69,7 +69,7 @@ interface UserPrinciple {
 /**
  * Main Edge Function handler
  */
-serve(async (req) => {
+Deno.serve(async (req: Request) => {
   const startTime = Date.now();
   
   // Handle CORS preflight requests

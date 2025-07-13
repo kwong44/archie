@@ -64,6 +64,7 @@ function RootLayoutNav() {
     const inTabsGroup = segments[0] === '(tabs)';
     const inReframeScreen = segments[0] === 'reframe';
     const inGuideScreen = segments[0] === 'guide';
+    const inEntryDetailScreen = segments[0] === 'entry-detail';
     const onSuccessScreen = segments.join('/').includes('success'); // Check if we're on the success screen
 
     navLogger.info('Navigation state evaluation', {
@@ -76,6 +77,7 @@ function RootLayoutNav() {
       inTabsGroup,
       inReframeScreen,
       inGuideScreen,
+      inEntryDetailScreen,
       onSuccessScreen,
       fullSegments: segments
     });
@@ -100,7 +102,7 @@ function RootLayoutNav() {
     } else if (session && onboardingCompleted === true) {
       // User is authenticated and has completed onboarding
       // Allow access to reframe screen without redirecting
-      if (!inTabsGroup && !inReframeScreen && !inGuideScreen && !onSuccessScreen) {
+      if (!inTabsGroup && !inReframeScreen && !inGuideScreen && !inEntryDetailScreen && !onSuccessScreen) {
         navLogger.info('Redirecting to main app - session exists and onboarding complete');
         router.replace('/(tabs)');
       }
@@ -116,6 +118,7 @@ function RootLayoutNav() {
       <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
       <Stack.Screen name="reframe" options={{ headerShown: false }} />
       <Stack.Screen name="paywall" options={{ headerShown: false }} />
+      <Stack.Screen name="entry-detail" options={{ headerShown: false }} />
       <Stack.Screen name="+not-found" />
     </Stack>
   );

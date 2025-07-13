@@ -292,14 +292,14 @@ const EntryDetailScreen: React.FC = () => {
       <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
         {/* Entry Breakdown */}
         <View style={styles.contentSection}>
-          <Text style={styles.sectionTitle}>💭 Entry Breakdown</Text>
+          <Text style={styles.sectionTitle}>Entry Breakdown</Text>
           <Text style={styles.analysisText}>{analysis.entry_breakdown}</Text>
         </View>
 
         {/* Mood */}
         {analysis.mood.length > 0 && (
           <View style={styles.contentSection}>
-            <Text style={styles.sectionTitle}>🎭 Mood</Text>
+            <Text style={styles.sectionTitle}>Mood</Text>
             <View style={styles.moodContainer}>
               {analysis.mood.map((mood, index) => (
                 <View key={index} style={styles.moodTag}>
@@ -327,7 +327,7 @@ const EntryDetailScreen: React.FC = () => {
         {/* Themes */}
         {analysis.identified_themes.length > 0 && (
           <View style={styles.contentSection}>
-            <Text style={styles.sectionTitle}>🎯 Themes</Text>
+            <Text style={styles.sectionTitle}>Themes</Text>
             <View style={styles.themesContainer}>
               {analysis.identified_themes.map((theme, index) => (
                 <View key={index} style={styles.themeTag}>
@@ -356,7 +356,7 @@ const EntryDetailScreen: React.FC = () => {
 
         {/* Actionable Insight */}
         <View style={styles.contentSection}>
-          <Text style={styles.sectionTitle}>💡 Actionable Insight</Text>
+          <Text style={styles.sectionTitle}>Actionable Insight</Text>
           <View style={styles.insightContainer}>
             <Text style={styles.insightText}>{analysis.actionable_insight}</Text>
           </View>
@@ -397,48 +397,43 @@ const EntryDetailScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backIcon}>
+      {/* Row: Back Button (absolute left), Tab Navigation (centered) */}
+      <View style={styles.topRowContainer}>
+        {/* Back Button pinned to the left edge */}
+        <TouchableOpacity onPress={handleBack} style={styles.inlineBackIcon} accessibilityLabel="Go back">
           <Ionicons name="chevron-back" size={24} color="#F5F5F0" />
         </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>{entry.description || 'Journal Entry'}</Text>
-          <Text style={styles.headerSubtitle}>{formatDate(entry.created_at)}</Text>
+        {/* Centered Tab Navigation */}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[
+              styles.tab,
+              activeTab === 'transcript' && styles.activeTab
+            ]}
+            onPress={() => handleTabChange('transcript')}
+          >
+            <Text style={[
+              styles.tabText,
+              activeTab === 'transcript' && styles.activeTabText
+            ]}>
+              Transcript
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.tab,
+              activeTab === 'analysis' && styles.activeTab
+            ]}
+            onPress={() => handleTabChange('analysis')}
+          >
+            <Text style={[
+              styles.tabText,
+              activeTab === 'analysis' && styles.activeTabText
+            ]}>
+              Analysis
+            </Text>
+          </TouchableOpacity>
         </View>
-      </View>
-
-      {/* Tab Navigation */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[
-            styles.tab,
-            activeTab === 'transcript' && styles.activeTab
-          ]}
-          onPress={() => handleTabChange('transcript')}
-        >
-          <Text style={[
-            styles.tabText,
-            activeTab === 'transcript' && styles.activeTabText
-          ]}>
-            Transcript
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[
-            styles.tab,
-            activeTab === 'analysis' && styles.activeTab
-          ]}
-          onPress={() => handleTabChange('analysis')}
-        >
-          <Text style={[
-            styles.tabText,
-            activeTab === 'analysis' && styles.activeTabText
-          ]}>
-            Analysis
-          </Text>
-        </TouchableOpacity>
       </View>
 
       {/* Tab Content */}
@@ -459,41 +454,44 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#121820',
   },
-  header: {
+  /**
+   * Top row container for back button and tabs
+   * - Back button is absolutely positioned left
+   * - Tab container is centered
+   */
+  topRowContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#374151',
+    justifyContent: 'center',
+    position: 'relative',
+    marginTop: 16,
+    marginBottom: 10,
+    height: 48, // Ensures enough height for absolute back button
   },
-  backIcon: {
-    marginRight: 16,
+  /**
+   * Back button pinned to the left edge
+   */
+  inlineBackIcon: {
+    position: 'absolute',
+    left: 20, // Flush with screen edge or desired padding
+    zIndex: 2,
+    padding: 4,
+    borderRadius: 8,
   },
-  headerContent: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 18,
-    color: '#F5F5F0',
-    marginBottom: 2,
-  },
-  headerSubtitle: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#9CA3AF',
-  },
+  /**
+   * Tab container is centered, with left padding to avoid overlap with back button
+   */
   tabContainer: {
     flexDirection: 'row',
     backgroundColor: '#1F2937',
-    marginHorizontal: 20,
-    marginTop: 16,
     borderRadius: 12,
     padding: 4,
+    minWidth: 0,
+    paddingLeft: 36, // Ensures tabs don't overlap with back button
+    paddingRight: 12, // Optional: add right padding for symmetry
   },
   tab: {
-    flex: 1,
+    paddingHorizontal: 20,
     paddingVertical: 12,
     alignItems: 'center',
     borderRadius: 8,
@@ -503,7 +501,7 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 16,
+    fontSize: 13,
     color: '#9CA3AF',
   },
   activeTabText: {

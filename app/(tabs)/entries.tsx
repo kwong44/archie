@@ -12,23 +12,17 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
+// import { LinearGradient } from 'expo-linear-gradient'; // No longer needed
 import { useAuth } from '@/context/AuthContext';
 import { SessionService, JournalSession } from '@/services/sessionService';
 import { logger } from '@/lib/logger';
+import { SkiaArt } from '@/app/SkiaArt'; // Import the new Skia component
 
 /**
  * EntriesScreen
  * ---------------------------------------------------------------------------
  * Displays a list of user's journal entries with AI analysis functionality.
- * Users can tap on entries to see detailed analysis including mood, themes,
- * and actionable insights from the AI Guide.
- * 
- * Following project guidelines:
- * - BaaS First: Uses Supabase for data operations
- * - Comprehensive Logging: Logs all user interactions
- * - Modular Architecture: Uses dedicated services
- * - TypeScript: Fully typed implementation
+ * Now uses a dynamic, generative Skia component for the card background.
  * ---------------------------------------------------------------------------
  */
 const EntriesScreen: React.FC = () => {
@@ -38,17 +32,11 @@ const EntriesScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  /**
-   * Load user's journal entries on component mount
-   */
   useEffect(() => {
     logger.info('EntriesScreen mounted, loading user entries');
     loadEntries();
   }, []);
 
-  /**
-   * Load entries from Supabase using SessionService
-   */
   const loadEntries = async () => {
     if (!session?.user) {
       logger.warn('No authenticated user, cannot load entries');
@@ -88,9 +76,6 @@ const EntriesScreen: React.FC = () => {
     }
   };
 
-  /**
-   * Handle pull-to-refresh
-   */
   const handleRefresh = async () => {
     setRefreshing(true);
     logger.info('Refreshing journal entries list');
@@ -98,9 +83,6 @@ const EntriesScreen: React.FC = () => {
     setRefreshing(false);
   };
 
-  /**
-   * Handle entry press - navigate to entry detail screen
-   */
   const handleEntryPress = (entry: JournalSession) => {
     logger.info('Navigating to entry detail', {
       userId: session?.user?.id,
@@ -114,9 +96,6 @@ const EntriesScreen: React.FC = () => {
     });
   };
 
-  /**
-   * Format date for display in the large format
-   */
   const formatCardDate = (dateString: string): { month: string; day: string } => {
     const date = new Date(dateString);
     return {
@@ -125,22 +104,17 @@ const EntriesScreen: React.FC = () => {
     };
   };
 
-  /**
-   * Get entry preview text - uses AI-generated description or fallback to transcript preview
-   */
   const getEntryPreview = (entry: JournalSession): string => {
-    // Use AI-generated description if available
     if (entry.description) {
       return entry.description;
     }
     
-    // Fallback to transcript preview (first 100 characters)
     const text = entry.reframed_text || entry.original_transcript || '';
     return text.length > 100 ? `${text.substring(0, 100)}...` : text;
   };
 
   /**
-   * Render individual entry item
+   * Render individual entry item using the new SkiaArt component
    */
   const renderEntryItem = ({ item }: { item: JournalSession }) => {
     const { month, day } = formatCardDate(item.created_at);
@@ -164,19 +138,18 @@ const EntriesScreen: React.FC = () => {
           </View>
         </View>
 
-        <LinearGradient
-          colors={['#FFC300', '#4A90E2', '#10B981']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.gradient}
-        />
+        {/* --- REPLACEMENT --- */}
+        {/* The LinearGradient is replaced with our new SkiaArt component. */}
+        {/* We pass the unique entry ID to seed the generative art. */}
+        <View style={styles.artContainer}>
+          <SkiaArt id={item.id} />
+        </View>
+        {/* --- END REPLACEMENT --- */}
+
       </TouchableOpacity>
     );
   };
 
-  /**
-   * Render empty state
-   */
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <Ionicons name="journal-outline" size={64} color="#6B7280" />
@@ -187,7 +160,6 @@ const EntriesScreen: React.FC = () => {
     </View>
   );
 
-  // Show loading state
   if (loading && !refreshing) {
     return (
       <SafeAreaView style={styles.container}>
@@ -230,9 +202,6 @@ const EntriesScreen: React.FC = () => {
 
 export default EntriesScreen;
 
-// ---------------------------------------------------------------------------
-// Styles
-// ---------------------------------------------------------------------------
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -266,7 +235,6 @@ const styles = StyleSheet.create({
   entryCard: {
     borderRadius: 24,
     marginBottom: 50,
-    
   },
   entryHeader: {
     flexDirection: 'row',
@@ -305,10 +273,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#9CA3AF',
   },
-  gradient: {
+  // We rename 'gradient' to 'artContainer' for clarity
+  artContainer: {
     height: 300,
     width: '100%',
     borderRadius: 16,
+    overflow: 'hidden', // Important to keep the rounded corners
   },
   emptyState: {
     alignItems: 'center',
@@ -339,4 +309,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#9CA3AF',
   },
-}); 
+});

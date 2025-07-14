@@ -16,7 +16,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { SessionService, JournalSession } from '@/services/sessionService';
 import { logger } from '@/lib/logger';
-import { SkiaArt } from '@/app/SkiaArt'; // Import the new Skia component
+import { SkiaArt } from '@/components/SkiaArt'; // Import the new Skia component
 
 /**
  * EntriesScreen

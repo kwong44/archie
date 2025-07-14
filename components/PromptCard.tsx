@@ -5,12 +5,12 @@
  */
 
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Platform, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Dimensions } from 'react-native';
 import { JournalPrompt, PromptCategory } from '@/services/promptService';
 import { useAnalytics } from '@/lib/analytics';
 import { logger } from '@/lib/logger';
-import { BlurView } from 'expo-blur';
 import { Mic, X } from 'lucide-react-native';
+import { DarkSkiaArt } from './DarkSkiaArt'; // Import the new component
 
 interface PromptCardProps {
   prompt: JournalPrompt;
@@ -70,25 +70,6 @@ export const PromptCard: React.FC<PromptCardProps> = ({
   };
 
   /**
-   * Returns a curated Pexels image URL per category for consistent quality
-   * Pexels images are free-to-use and don't require an API key for static links
-   */
-  const getBackgroundImage = (category: PromptCategory): string => {
-    const images: Record<PromptCategory, string> = {
-      [PromptCategory.RELATIONSHIPS]: 'https://images.pexels.com/photos/4101182/pexels-photo-4101182.jpeg?auto=compress&cs=tinysrgb&h=600&w=800',
-      [PromptCategory.WORK_CAREER]: 'https://images.pexels.com/photos/3184297/pexels-photo-3184297.jpeg?auto=compress&cs=tinysrgb&h=600&w=800',
-      [PromptCategory.PERSONAL_GROWTH]: 'https://images.pexels.com/photos/1557238/pexels-photo-1557238.jpeg?auto=compress&cs=tinysrgb&h=600&w=800',
-      [PromptCategory.HEALTH_WELLNESS]: 'https://images.pexels.com/photos/1552102/pexels-photo-1552102.jpeg?auto=compress&cs=tinysrgb&h=600&w=800',
-      [PromptCategory.FEARS_ANXIETIES]: 'https://images.pexels.com/photos/3225517/pexels-photo-3225517.jpeg?auto=compress&cs=tinysrgb&h=600&w=800',
-      [PromptCategory.DREAMS_ASPIRATIONS]: 'https://images.pexels.com/photos/2662116/pexels-photo-2662116.jpeg?auto=compress&cs=tinysrgb&h=600&w=800',
-      [PromptCategory.PAST_EXPERIENCES]: 'https://images.pexels.com/photos/3930128/pexels-photo-3930128.jpeg?auto=compress&cs=tinysrgb&h=600&w=800',
-      [PromptCategory.DAILY_MOMENTS]: 'https://images.pexels.com/photos/2127929/pexels-photo-2127929.jpeg?auto=compress&cs=tinysrgb&h=600&w=800',
-      [PromptCategory.DAILY_CHECKIN]: 'https://images.pexels.com/photos/2127929/pexels-photo-2127929.jpeg?auto=compress&cs=tinysrgb&h=600&w=800'
-    };
-    return images[category] || 'https://images.pexels.com/photos/3573351/pexels-photo-3573351.jpeg?auto=compress&cs=tinysrgb&h=600&w=800';
-  };
-
-  /**
    * Handles prompt card press - tracks analytics and triggers callback
    */
   const handlePromptPress = () => {
@@ -134,15 +115,25 @@ export const PromptCard: React.FC<PromptCardProps> = ({
 
   const categoryColor = getCategoryColor(prompt.category);
 
-  const backgroundImageUri = getBackgroundImage(prompt.category);
+  // Create a stable identifier for the generative art from the prompt's content.
+  // The prompt.id is generated with Date.now() and is not stable across renders,
+  // which causes the Skia art to flicker or fail. Combining category and title
+  // gives us a consistent seed for the art, mirroring how stable DB IDs work.
+  const stableArtId = React.useMemo(
+    () => `${prompt.category}-${prompt.title}`,
+    [prompt.category, prompt.title]
+  );
 
   return (
     <View style={styles.cardContainer}>
-      {/* Background layer */}
-      <Image source={{ uri: backgroundImageUri }} style={styles.backgroundImage} />
-
+     {/* --- REPLACEMENT --- */}
+      {/* The static Image is replaced with our new DarkSkiaArt component. */}
+      {/* We pass the new stableArtId to seed the generative art. */}
+      <DarkSkiaArt id={stableArtId} />
+      {/* --- END REPLACEMENT --- */}
+      
       {/* Glass-style overlay with blur */}
-      <BlurView intensity={Platform.OS === 'web' ? 50 : 80} style={styles.blurOverlay}>
+      <View style={styles.overlay}>
         {/* Skip control (top-right) */}
         {onSkip && (
           <TouchableOpacity style={styles.skipButton} onPress={handleSkip} activeOpacity={0.7}>
@@ -171,7 +162,7 @@ export const PromptCard: React.FC<PromptCardProps> = ({
             <Mic color="#121820" size={32} strokeWidth={2} />
           </TouchableOpacity>
         </View>
-      </BlurView>
+      </View>
     </View>
   );
 };
@@ -183,12 +174,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     overflow: 'hidden',
   },
-  backgroundImage: {
-    width: '100%',
-    height: '100%',
-    position: 'absolute',
-  },
-  blurOverlay: {
+  overlay: {
     flex: 1,
     padding: 24,
     justifyContent: 'space-between',

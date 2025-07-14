@@ -84,12 +84,27 @@ export interface AnalyzeEntryRequest {
   journal_session_id: string;
 }
 
+/**
+ * Defines the structured object for the actionable insight, which includes a
+ * reflection prompt and an optional, concrete action suggestion.
+ */
+export interface ActionableInsight {
+  reflection_prompt: string;
+  action_suggestion?: {
+    title: string;
+    description: string;
+  };
+}
+
+/**
+ * Defines the structured response from the entry analysis AI endpoint.
+ */
 export interface AnalyzeEntryResponse {
   entry_breakdown: string;
   mood: string[];
   people: string[];
   identified_themes: string[];
-  actionable_insight: string;
+  actionable_insight: ActionableInsight; // Updated to new structured object
   processing_time_ms: number;
   lexicon_words_identified: Array<{
     old: string;

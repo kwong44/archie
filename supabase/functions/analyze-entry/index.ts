@@ -29,12 +29,23 @@ interface AnalyzeEntryRequest {
   journal_session_id: string;
 }
 
+/**
+ * Defines the structured object for the actionable insight.
+ */
+interface ActionableInsight {
+  reflection_prompt: string;
+  action_suggestion?: {
+    title: string;
+    description: string;
+  };
+}
+
 interface AnalyzeEntryResponse {
   entry_breakdown: string;
   mood: string[];
   people: string[];
   identified_themes: string[];
-  actionable_insight: string;
+  actionable_insight: ActionableInsight;
   processing_time_ms: number;
   lexicon_words_identified: Array<{
     old: string;
@@ -50,6 +61,12 @@ interface JournalSession {
   reframed_text: string | null;
   ai_summary: string | null;
   created_at: string;
+  transformations_applied: Array<{
+    lexicon_id: string;
+    old_word: string;
+    new_word: string;
+    position_in_text: number;
+  }> | null;
 }
 
 interface UserLexicon {
@@ -185,32 +202,29 @@ Deno.serve(async (req: Request) => {
     const userLexicon = lexiconResult.data as UserLexicon[] || [];
     const userPrinciples = principlesResult.data as UserPrinciple[] || [];
 
+    // Extract the actual transformations applied by the user during the session.
+    // This is the ground truth for what the user reframed.
+    const transformationsApplied = journalSession.transformations_applied || [];
+
     console.log('📊 Data fetched successfully', {
       userId: user.id,
       sessionId: journalSession.id,
       lexiconCount: userLexicon.length,
       principlesCount: userPrinciples.length,
-      transcriptLength: journalSession.original_transcript?.length || 0
+      transcriptLength: journalSession.original_transcript?.length || 0,
+      transformationsAppliedCount: transformationsApplied.length,
     });
 
-    // Identify lexicon words used in the original transcript
-    const lexiconWordsUsed = identifyLexiconWords(
-      journalSession.original_transcript, 
-      userLexicon
-    );
-
-    console.log('🔤 Lexicon words identified', {
-      userId: user.id,
-      sessionId: journalSession.id,
-      wordsFound: lexiconWordsUsed.length
-    });
-
-    // Construct the AI analysis request
+    // Construct the AI analysis request with the actual transformations
     const aiAnalysisRequest = {
       original_transcript: journalSession.original_transcript,
       reframed_text: journalSession.reframed_text || '',
-      lexicon_words_used: lexiconWordsUsed,
-      user_principles: userPrinciples.map(p => p.principle)
+      // This key MUST match what the system prompt expects
+      transformations_applied: transformationsApplied.map(t => ({
+        old_word: t.old_word,
+        new_word: t.new_word,
+      })),
+      user_principles: userPrinciples.map(p => p.principle),
     };
 
     // Call Google Gemini API for analysis
@@ -230,7 +244,12 @@ Deno.serve(async (req: Request) => {
     const response: AnalyzeEntryResponse = {
       ...geminiResponse,
       processing_time_ms: processingTime,
-      lexicon_words_identified: lexiconWordsUsed
+      // The frontend expects this field to render the list of transformed words.
+      // We derive it from the transformations that were actually applied.
+      lexicon_words_identified: transformationsApplied.map(t => ({
+        old: t.old_word,
+        new: t.new_word,
+      })),
     };
 
     return new Response(
@@ -264,52 +283,13 @@ Deno.serve(async (req: Request) => {
 });
 
 /**
- * Identifies lexicon words used in the transcript
- * Performs case-insensitive matching and provides context
- */
-function identifyLexiconWords(
-  transcript: string, 
-  lexicon: UserLexicon[]
-): Array<{ old: string; new: string; context?: string }> {
-  const wordsFound: Array<{ old: string; new: string; context?: string }> = [];
-  
-  if (!transcript || !lexicon.length) {
-    return wordsFound;
-  }
-
-  const transcriptLower = transcript.toLowerCase();
-  
-  // Check each lexicon entry for matches
-  for (const wordPair of lexicon) {
-    const oldWordLower = wordPair.old_word.toLowerCase();
-    
-    // Check if the old word appears in the transcript
-    if (transcriptLower.includes(oldWordLower)) {
-      // Find the context around the word (20 characters before and after)
-      const wordIndex = transcriptLower.indexOf(oldWordLower);
-      const contextStart = Math.max(0, wordIndex - 20);
-      const contextEnd = Math.min(transcript.length, wordIndex + oldWordLower.length + 20);
-      const context = transcript.substring(contextStart, contextEnd).trim();
-      
-      wordsFound.push({
-        old: wordPair.old_word,
-        new: wordPair.new_word,
-        context: context
-      });
-    }
-  }
-  
-  return wordsFound;
-}
-
-/**
  * Calls Google Gemini API for structured journal entry analysis
  * Uses the super system prompt to provide empathetic, insightful analysis
  */
 async function callGeminiAnalysis(request: {
   original_transcript: string;
   reframed_text: string;
-  lexicon_words_used: Array<{ old: string; new: string; context?: string }>;
+  transformations_applied: Array<{ old_word: string; new_word: string }>;
   user_principles: string[];
 }): Promise<Omit<AnalyzeEntryResponse, 'processing_time_ms' | 'lexicon_words_identified'>> {
   
@@ -337,11 +317,13 @@ Your Task:
 You will be given a JSON object containing a user's journal entry, their reframed text, a list of the specific words they transformed from their personal lexicon, and their core principles.
 
 Based on this data, you must generate a structured JSON response with the following fields:
-- entry_breakdown: (string) Write a 3-4 sentence narrative analysis of the entry. Start by acknowledging their experience, then highlight the transformation they are creating.
+- entry_breakdown: (string) Write a 5-6 sentence narrative analysis of the entry. Start by acknowledging the user's experience and validating their feelings. If the user reframed a word, directly connect a core theme from their 'original_transcript' to the 'reframed_text', explaining how their intentional language shift (using their 'transformations_applied') is a tangible step toward their 'user_principles'. The goal is to act as a mirror, showing them the 'why' behind their reframing work.
 - mood: (array of strings) Based on the entry, identify up to 5 key moods or emotional states. These should be single, powerful words.
 - people: (array of strings) If any specific people are mentioned, list their names or roles here. If none, return an empty array.
 - identified_themes: (array of strings) Identify 2-3 core psychological or emotional themes present in the entry.
-- actionable_insight: (string) Provide one concise, thought-provoking question or a gentle challenge for the user to consider.
+- actionable_insight: (object) Provide a multi-faceted insight with two parts:
+  - "reflection_prompt": (string) A concise, thought-provoking question that encourages deeper introspection on the entry's core theme.
+  - "action_suggestion": (object, optional) If applicable, provide a small, concrete action the user could take. This should be a simple, real-world practice. Give it a "title" and a "description". Examples: "The 5-Minute 'And' Journal," "Mindful Name Association," or "Embodied Principle." If no clear action applies, this can be omitted.
 
 CRITICAL: Your response must be ONLY a valid JSON object with no additional text or explanations.`;
 
@@ -353,9 +335,12 @@ CRITICAL: Your response must be ONLY a valid JSON object with no additional text
   console.log('🤖 Calling Gemini API for analysis', {
     transcriptLength: request.original_transcript.length,
     reframedTextLength: request.reframed_text.length,
-    lexiconWordsCount: request.lexicon_words_used.length,
-    principlesCount: request.user_principles.length
+    transformationsCount: request.transformations_applied.length,
+    principlesCount: request.user_principles.length,
   });
+
+  // Log the full prompt for debugging
+  console.log('✨ Full prompt sent to Gemini:', fullPrompt);
 
   try {
     const response = await fetch(
@@ -404,16 +389,40 @@ CRITICAL: Your response must be ONLY a valid JSON object with no additional text
 
     const generatedText = geminiResult.candidates[0].content.parts[0].text;
     
-    console.log('✅ Gemini API response received', {
-      responseLength: generatedText.length
-    });
+    // Log the raw text response from Gemini before parsing
+    console.log('✅ Gemini API raw text response received:', generatedText);
+
+    // Clean the response to ensure it's valid JSON.
+    // AI models can sometimes wrap the JSON in markdown or add extra text.
+    let cleanedText = generatedText.trim();
+    if (cleanedText.startsWith('```json')) {
+      // Handles markdown with json language specifier
+      cleanedText = cleanedText.slice(7, -3).trim();
+    } else if (cleanedText.startsWith('```')) {
+      // Handles generic markdown block
+      cleanedText = cleanedText.slice(3, -3).trim();
+    }
+    
+    // Find the first '{' and last '}' to extract the JSON object
+    const jsonStartIndex = cleanedText.indexOf('{');
+    const jsonEndIndex = cleanedText.lastIndexOf('}');
+    
+    if (jsonStartIndex !== -1 && jsonEndIndex !== -1) {
+      cleanedText = cleanedText.substring(jsonStartIndex, jsonEndIndex + 1);
+    } else {
+        // If we can't find a JSON object, we'll likely fail parsing, which is handled below.
+        console.warn('⚠️ Could not find JSON object in Gemini response after cleaning.', { cleanedText });
+    }
+
+    // Log the cleaned text for debugging
+    console.log('🧼 Cleaned Gemini API response for parsing:', cleanedText);
 
     // Parse the JSON response from Gemini
     try {
-      const analysisResult = JSON.parse(generatedText);
+      const analysisResult = JSON.parse(cleanedText);
       
       // Validate the response structure
-      if (!analysisResult.entry_breakdown || !analysisResult.mood || !analysisResult.actionable_insight) {
+      if (!analysisResult.entry_breakdown || !analysisResult.mood || !analysisResult.actionable_insight || !analysisResult.actionable_insight.reflection_prompt) {
         console.error('❌ Invalid analysis structure from Gemini', { analysisResult });
         throw new Error('Invalid analysis structure from AI');
       }
@@ -429,7 +438,7 @@ CRITICAL: Your response must be ONLY a valid JSON object with no additional text
     } catch (parseError) {
       console.error('❌ Failed to parse Gemini JSON response', {
         error: parseError instanceof Error ? parseError.message : String(parseError),
-        generatedText
+        cleanedText
       });
       
       // Return a fallback analysis if JSON parsing fails
@@ -438,7 +447,9 @@ CRITICAL: Your response must be ONLY a valid JSON object with no additional text
         mood: ["reflective", "hopeful", "determined"],
         people: [],
         identified_themes: ["self-reflection", "personal growth", "language transformation"],
-        actionable_insight: "What would it feel like to fully embody the empowering words you've chosen in your daily thoughts and conversations?"
+        actionable_insight: {
+          reflection_prompt: "What would it feel like to fully embody the empowering words you've chosen in your daily thoughts and conversations?",
+        }
       };
     }
 
@@ -453,7 +464,9 @@ CRITICAL: Your response must be ONLY a valid JSON object with no additional text
       mood: ["reflective", "hopeful", "determined"],
       people: [],
       identified_themes: ["self-reflection", "personal growth", "language transformation"],
-      actionable_insight: "What would it feel like to fully embody the empowering words you've chosen in your daily thoughts and conversations?"
+      actionable_insight: {
+        reflection_prompt: "What would it feel like to fully embody the empowering words you've chosen in your daily thoughts and conversations?"
+      }
     };
   }
 } 

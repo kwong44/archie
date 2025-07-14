@@ -13,7 +13,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { SessionService, JournalSession } from '@/services/sessionService';
-import { aiApiClient, AnalyzeEntryResponse } from '@/lib/aiApiClient';
+import {
+  aiApiClient,
+  AnalyzeEntryResponse,
+  ActionableInsight,
+} from '@/lib/aiApiClient';
 import { logger } from '@/lib/logger';
 
 /**
@@ -356,10 +360,26 @@ const EntryDetailScreen: React.FC = () => {
 
         {/* Actionable Insight */}
         <View style={styles.contentSection}>
-          <Text style={styles.sectionTitle}>Actionable Insight</Text>
+          <Text style={styles.sectionTitle}>For Your Journey</Text>
+
+          {/* Reflection Prompt */}
           <View style={styles.insightContainer}>
-            <Text style={styles.insightText}>{analysis.actionable_insight}</Text>
+            <Text style={styles.insightText}>
+              {analysis.actionable_insight.reflection_prompt}
+            </Text>
           </View>
+
+          {/* Action Suggestion (if it exists) */}
+          {analysis.actionable_insight.action_suggestion && (
+            <View style={styles.actionContainer}>
+              <Text style={styles.actionTitle}>
+                {analysis.actionable_insight.action_suggestion.title}
+              </Text>
+              <Text style={styles.actionDescription}>
+                {analysis.actionable_insight.action_suggestion.description}
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
     );
@@ -666,6 +686,26 @@ const styles = StyleSheet.create({
     color: '#F5F5F0',
     lineHeight: 24,
     fontStyle: 'italic',
+  },
+  actionContainer: {
+    marginTop: 16,
+    backgroundColor: '#1F2937',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#374151',
+  },
+  actionTitle: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 16,
+    color: '#FFC300',
+    marginBottom: 8,
+  },
+  actionDescription: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#F5F5F0',
+    lineHeight: 22,
   },
   loadingContainer: {
     flex: 1,

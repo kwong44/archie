@@ -66,11 +66,6 @@ export default function TabLayout() {
           title: 'Journey',
           headerShown: true,
           headerTransparent: true,
-          headerRight: () => (
-            <Link href="/guide" style={{ marginRight: 20 }}>
-              <Settings color="#FFC300" size={24} />
-            </Link>
-          ),
           tabBarIcon: ({ color, size }) => (
             <TabBarIcon IconComponent={BarChart3} color={color} size={size} />
           ),

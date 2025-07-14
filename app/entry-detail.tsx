@@ -487,7 +487,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 4,
     minWidth: 0,
-    paddingLeft: 36, // Ensures tabs don't overlap with back button
+    paddingLeft: 12, // Ensures tabs don't overlap with back button
     paddingRight: 12, // Optional: add right padding for symmetry
   },
   tab: {

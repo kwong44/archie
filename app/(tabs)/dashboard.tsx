@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Calendar, TrendingUp, Clock, Award } from 'lucide-react-native';
+import { Calendar, TrendingUp, Clock, Award, Settings } from 'lucide-react-native';
 import { useAuth } from '@/context/AuthContext';
 import { DashboardService } from '@/services/dashboardService';
 import { InsightsService } from '@/services/insightsService';
 import { logger } from '@/lib/logger';
 import type { DashboardMetrics, UserAchievement } from '@/services/dashboardService';
 import type { UserInsight } from '@/services/insightsService';
+import { useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
 export default function DashboardScreen() {
   const { session } = useAuth();
+  const router = useRouter();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [achievements, setAchievements] = useState<UserAchievement[]>([]);
   const [insights, setInsights] = useState<UserInsight[]>([]);
@@ -104,9 +106,26 @@ export default function DashboardScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Your Journey</Text>
-          <Text style={styles.subtitle}>Progress in your personal transformation</Text>
+        {/* Use a relative container so the settings icon can be absolutely positioned and not take up space */}
+        <View style={{ position: 'relative', minHeight: 40 }}>
+          {/* Settings icon overlays top right, does not push content down */}
+          <View style={{ position: 'absolute', top: 0, right: 0, zIndex: 10 }}>
+            <TouchableOpacity
+              onPress={() => {
+                logger.info('Settings icon pressed from dashboard scrollable content');
+                router.push('/guide');
+              }}
+              accessibilityLabel="Open settings"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Settings color="#FFC300" size={28} />
+            </TouchableOpacity>
+          </View>
+          {/* Add top padding to header so icon doesn't overlap */}
+          <View style={[styles.header, { paddingTop: 8 }]}> 
+            <Text style={styles.title}>Your Journey</Text>
+            <Text style={styles.subtitle}>Progress in your personal transformation</Text>
+          </View>
         </View>
 
         {/* Key Metrics */}

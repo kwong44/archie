@@ -45,7 +45,8 @@ export const PromptCard: React.FC<PromptCardProps> = ({
       [PromptCategory.FEARS_ANXIETIES]: 'Fears & Anxieties',
       [PromptCategory.DREAMS_ASPIRATIONS]: 'Dreams & Aspirations',
       [PromptCategory.PAST_EXPERIENCES]: 'Past Experiences',
-      [PromptCategory.DAILY_MOMENTS]: 'Daily Moments'
+      [PromptCategory.DAILY_MOMENTS]: 'Daily Moments',
+      [PromptCategory.DAILY_CHECKIN]: 'Daily Check-in'
     };
     return categoryNames[category] || category;
   };
@@ -62,7 +63,8 @@ export const PromptCard: React.FC<PromptCardProps> = ({
       [PromptCategory.FEARS_ANXIETIES]: '#8B5CF6', // Purple
       [PromptCategory.DREAMS_ASPIRATIONS]: '#F59E0B', // Amber
       [PromptCategory.PAST_EXPERIENCES]: '#EF4444', // Red
-      [PromptCategory.DAILY_MOMENTS]: '#6B7280' // Gray
+      [PromptCategory.DAILY_MOMENTS]: '#6B7280', // Gray
+      [PromptCategory.DAILY_CHECKIN]: '#FF8C00' // Orange
     };
     return categoryColors[category] || '#9CA3AF';
   };
@@ -81,6 +83,7 @@ export const PromptCard: React.FC<PromptCardProps> = ({
       [PromptCategory.DREAMS_ASPIRATIONS]: 'https://images.pexels.com/photos/2662116/pexels-photo-2662116.jpeg?auto=compress&cs=tinysrgb&h=600&w=800',
       [PromptCategory.PAST_EXPERIENCES]: 'https://images.pexels.com/photos/3930128/pexels-photo-3930128.jpeg?auto=compress&cs=tinysrgb&h=600&w=800',
       [PromptCategory.DAILY_MOMENTS]: 'https://images.pexels.com/photos/2127929/pexels-photo-2127929.jpeg?auto=compress&cs=tinysrgb&h=600&w=800',
+      [PromptCategory.DAILY_CHECKIN]: 'https://images.pexels.com/photos/2127929/pexels-photo-2127929.jpeg?auto=compress&cs=tinysrgb&h=600&w=800'
     };
     return images[category] || 'https://images.pexels.com/photos/3573351/pexels-photo-3573351.jpeg?auto=compress&cs=tinysrgb&h=600&w=800';
   };

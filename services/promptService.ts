@@ -13,7 +13,8 @@ export enum PromptCategory {
   FEARS_ANXIETIES = 'fears_anxieties',
   DREAMS_ASPIRATIONS = 'dreams_aspirations',
   PAST_EXPERIENCES = 'past_experiences',
-  DAILY_MOMENTS = 'daily_moments'
+  DAILY_MOMENTS = 'daily_moments',
+  DAILY_CHECKIN = 'daily_checkin' // Fallback for when all topics are explored
 }
 
 /**
@@ -44,7 +45,7 @@ export class PromptService {
       // Get user's recent journal entries to analyze patterns
       const { data: recentEntries, error } = await supabase
         .from('journal_sessions')
-        .select('original_transcript, reframed_text, created_at')
+        .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(20);
@@ -56,22 +57,31 @@ export class PromptService {
 
       // Analyze which categories the user has explored
       const exploredCategories = this.analyzeTopicCoverage(recentEntries || []);
-      const unexploredCategories = this.getUnexploredCategories(exploredCategories);
+      let categoriesForPrompts = this.getUnexploredCategories(exploredCategories);
+      let isPersonalized = true;
+
+      // If all categories have been explored, use DAILY_CHECKIN as a resilient fallback
+      if (categoriesForPrompts.length === 0 && recentEntries.length > 0) {
+        logger.info('All topic categories explored, falling back to daily check-in prompts.', { userId });
+        categoriesForPrompts = [PromptCategory.DAILY_CHECKIN];
+        isPersonalized = false; // Indicate these are general, not based on gaps
+      }
       
-      // Generate prompts prioritizing unexplored areas
-      const personalizedPrompts = this.generatePromptsForCategories(
-        unexploredCategories.slice(0, limit),
-        true // isPersonalized = true
+      // Generate prompts prioritizing unexplored areas or the fallback
+      const generatedPrompts = this.generatePromptsForCategories(
+        categoriesForPrompts.slice(0, limit),
+        isPersonalized
       );
 
       logger.info('Generated personalized prompts', { 
         userId, 
         exploredCategories: exploredCategories.length,
-        unexploredCategories: unexploredCategories.length,
-        promptsGenerated: personalizedPrompts.length 
+        unexploredCategories: this.getUnexploredCategories(exploredCategories).length,
+        promptsGenerated: generatedPrompts.length,
+        usedFallback: categoriesForPrompts[0] === PromptCategory.DAILY_CHECKIN
       });
 
-      return personalizedPrompts;
+      return generatedPrompts;
 
     } catch (error) {
       logger.error('Error generating personalized prompts', { userId, error });
@@ -266,6 +276,23 @@ export class PromptService {
           title: "Mindful Reflection",
           prompt: "How are you showing up in this moment? What if every interaction is a chance to practice your values?",
           level: 'deep'
+        }
+      ],
+      [PromptCategory.DAILY_CHECKIN]: [
+        {
+          title: "Mindful Check-in",
+          prompt: "Take a deep breath. What's the most present feeling in your body right now? No need to change it, just notice.",
+          level: 'surface'
+        },
+        {
+          title: "Energy Scan",
+          prompt: "What is one thing that gave you energy today, and one thing that took it away? Let's explore that.",
+          level: 'medium'
+        },
+        {
+          title: "A Single Word",
+          prompt: "If you had to describe your day so far in a single word, what would it be? Let's start there.",
+          level: 'surface'
         }
       ]
     };

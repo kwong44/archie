@@ -87,6 +87,16 @@ const EntryDetailScreen: React.FC = () => {
       const entryDetails = await SessionService.getSessionById(entryId, session.user.id);
       setEntry(entryDetails);
 
+      // If analysis data already exists, set it in the state
+      if (entryDetails.ai_analysis) {
+        logger.info('Found existing analysis data in session', {
+          entryId,
+          userId: session.user.id,
+          context: 'EntryDetailScreen'
+        });
+        setAnalysis(entryDetails.ai_analysis);
+      }
+
       logger.info('Entry details loaded successfully', {
         entryId,
         userId: session.user.id,
@@ -120,10 +130,20 @@ const EntryDetailScreen: React.FC = () => {
    * Handle entry analysis when analysis tab is selected
    */
   const handleAnalysisTab = async () => {
+    // Check if analysis should be triggered
+    if (activeTab === 'analysis' || analysis || !entry || analyzingEntry) {
+      // If already on analysis tab, or analysis exists, or no entry, or already analyzing, do nothing
+      return;
+    }
+    
     setActiveTab('analysis');
 
-    // If analysis already loaded, don't reload
-    if (analysis || !entry || analyzingEntry) {
+    // If analysis already loaded from initial fetch, don't reload
+    if (entry.ai_analysis) {
+      logger.info('Using pre-loaded analysis data from entry object', {
+        entryId: entry.id,
+        context: 'EntryDetailScreen'
+      });
       return;
     }
 
@@ -178,7 +198,7 @@ const EntryDetailScreen: React.FC = () => {
       context: 'EntryDetailScreen'
     });
 
-    if (tab === 'analysis') {
+    if (tab === 'analysis' && !analysis) {
       handleAnalysisTab();
     } else {
       setActiveTab(tab);
@@ -485,7 +505,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
     marginTop: 16,
-    marginBottom: 10,
     height: 48, // Ensures enough height for absolute back button
   },
   /**
@@ -543,6 +562,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#F5F5F0',
     marginBottom: 12,
+    marginTop: 12,
   },
   transcriptText: {
     fontFamily: 'Inter-Regular',

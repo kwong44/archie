@@ -3,6 +3,7 @@ import { createContextLogger } from '@/lib/logger';
 import { LexiconService } from './lexiconService';
 import { AchievementsService } from './achievementsService';
 import type { AchievementAwardResult } from './achievementsService';
+import { AnalyzeEntryResponse } from '@/lib/aiApiClient';
 
 // Create context-specific logger for session operations
 const sessionLogger = createContextLogger('SessionService');
@@ -24,6 +25,7 @@ export interface JournalSession {
   transformations_applied: TransformationApplied[];
   created_at: string;
   updated_at: string;
+  ai_analysis?: AnalyzeEntryResponse | null;
 }
 
 export interface TransformationApplied {

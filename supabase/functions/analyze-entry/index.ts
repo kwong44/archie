@@ -251,6 +251,25 @@ Deno.serve(async (req: Request) => {
         new: t.new_word,
       })),
     };
+    
+    // Asynchronously save the analysis to the database without waiting for it to complete.
+    // This improves response time for the user.
+    supabase
+      .from('journal_sessions')
+      .update({ ai_analysis: response })
+      .eq('id', journalSession.id)
+      .then(({ error }: { error: any }) => {
+        if (error) {
+          console.error('❌ Failed to save AI analysis to database', {
+            sessionId: journalSession.id,
+            error: error.message,
+          });
+        } else {
+          console.log('✅ AI analysis saved to database successfully', {
+            sessionId: journalSession.id,
+          });
+        }
+      });
 
     return new Response(
       JSON.stringify(response),

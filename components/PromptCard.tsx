@@ -204,17 +204,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   greetingText: {
-    fontSize: 16,
+    fontSize: 13,
     fontFamily: 'Inter-Regular',
     color: '#FFFFFF',
     opacity: 0.8,
     marginBottom: 12,
   },
   promptText: {
-    fontSize: 20,
+    fontSize: 17,
     fontFamily: 'Inter-Medium',
     color: '#FFFFFF',
-    lineHeight: 34,
+    lineHeight: 28,
   },
   actionButtons: {
     flexDirection: 'row',

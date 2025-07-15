@@ -17,6 +17,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
 import { logger } from '../../lib/logger';
 import { finishOAuth } from '../../lib/finishOAuth';
+import * as AppleAuthentication from 'expo-apple-authentication';
 
 /**
  * LoginScreen Component
@@ -30,6 +31,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   const router = useRouter();
 
   /**
@@ -131,6 +133,55 @@ export default function LoginScreen() {
   }
 
   /**
+   * Handles Apple Sign-In using the native flow.
+   * It requests user credentials and then uses the identity token
+   * to authenticate with Supabase.
+   */
+  async function signInWithApple() {
+    logger.info('Initiating Apple OAuth sign-in');
+    setAppleLoading(true);
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      // Check if you received the identity token
+      if (credential.identityToken) {
+        logger.info('Apple sign-in successful, exchanging token with Supabase.');
+        // Sign in with Supabase using the identity token
+        const { error } = await supabase.auth.signInWithIdToken({
+          provider: 'apple',
+          token: credential.identityToken,
+        });
+
+        if (error) {
+          Alert.alert('Error', 'Failed to sign in with Apple. Please try again.');
+          logger.error('Supabase sign-in with Apple ID token error:', { error });
+        } else {
+          // Successful sign-in, navigation will be handled by your AuthContext
+          logger.info('Successfully signed in with Apple');
+        }
+      } else {
+        logger.warn('No identityToken found from Apple credential');
+        throw new Error('No identityToken found');
+      }
+    } catch (e: any) {
+      if (e.code === 'ERR_REQUEST_CANCELED') {
+        // Handle user canceling the sign-in flow
+        logger.info('User canceled Apple Sign-In.');
+      } else {
+        Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+        logger.error('Apple Sign-In error:', { error: e });
+      }
+    } finally {
+      setAppleLoading(false);
+    }
+  }
+
+  /**
    * Dismisses the keyboard when user taps outside input fields
    * Improves user experience on mobile devices
    */
@@ -155,7 +206,7 @@ export default function LoginScreen() {
             onChangeText={setEmail}
             autoCapitalize="none"
             keyboardType="email-address"
-            editable={!loading && !googleLoading}
+            editable={!loading && !googleLoading && !appleLoading}
           />
           <TextInput
             style={styles.input}
@@ -164,7 +215,7 @@ export default function LoginScreen() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry
-            editable={!loading && !googleLoading}
+            editable={!loading && !googleLoading && !appleLoading}
           />
         </View>
 
@@ -173,7 +224,7 @@ export default function LoginScreen() {
           <TouchableOpacity 
             style={styles.button} 
             onPress={signInWithEmail} 
-            disabled={loading || googleLoading}
+            disabled={loading || googleLoading || appleLoading}
           >
             {loading ? (
               <ActivityIndicator color="#121820" />
@@ -193,7 +244,7 @@ export default function LoginScreen() {
           <TouchableOpacity 
             style={styles.googleButton} 
             onPress={signInWithGoogle}
-            disabled={loading || googleLoading}
+            disabled={loading || googleLoading || appleLoading}
           >
             {googleLoading ? (
               <ActivityIndicator color="#374151" size="small" />
@@ -208,11 +259,24 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
+          {/* Apple Sign In Button */}
+          {appleLoading ? (
+             <ActivityIndicator color="#FFFFFF" style={styles.appleButton} />
+          ) : (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+              cornerRadius={12}
+              style={styles.appleButton}
+              onPress={signInWithApple}
+            />
+          )}
+
           {/* Navigate to Sign Up */}
           <TouchableOpacity 
             style={[styles.button, styles.secondaryButton]} 
             onPress={() => router.push('/(auth)/signup' as any)} 
-            disabled={loading || googleLoading}
+            disabled={loading || googleLoading || appleLoading}
           >
             <Text style={[styles.buttonText, styles.secondaryButtonText]}>Create Account</Text>
           </TouchableOpacity>
@@ -342,5 +406,9 @@ const styles = StyleSheet.create({
     color: '#374151', // Dark gray text on white background
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
+  },
+  appleButton: {
+    width: '100%',
+    height: 50,
   },
 }); 

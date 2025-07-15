@@ -17,6 +17,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
 import { logger } from '../../lib/logger';
 import { finishOAuth } from '../../lib/finishOAuth';
+import * as AppleAuthentication from 'expo-apple-authentication';
 
 /**
  * SignUpScreen Component
@@ -32,6 +33,7 @@ export default function SignUpScreen() {
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   const router = useRouter();
 
   /**
@@ -210,6 +212,65 @@ export default function SignUpScreen() {
   }
 
   /**
+   * Handles Apple OAuth registration using Supabase Auth.
+   * Uses expo-apple-authentication for the native sign-in flow.
+   * On first sign-up, it attempts to update the user's profile with their full name.
+   */
+  async function signUpWithApple() {
+    logger.info('Initiating Apple OAuth sign-up');
+    setAppleLoading(true);
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      // Check if you received the identity token
+      if (credential.identityToken) {
+        logger.info('Apple sign-in successful, exchanging token with Supabase.');
+        // Sign in with Supabase using the identity token
+        const { data, error } = await supabase.auth.signInWithIdToken({
+          provider: 'apple',
+          token: credential.identityToken,
+        });
+
+        if (error) {
+          Alert.alert('Error', 'Failed to sign up with Apple. Please try again.');
+          logger.error('Supabase sign-in with Apple ID token error:', { error });
+        } else {
+          // Successful sign-in
+          logger.info('Successfully signed up with Apple');
+          if (credential.fullName && data.user) {
+            // If user provides name during first Apple sign up, update their profile.
+            // Subsequent sign ins will not return fullName.
+            const { givenName, familyName } = credential.fullName;
+            const name = [givenName, familyName].filter(Boolean).join(' ');
+            if (name) {
+              await updateUserProfile(data.user.id, name);
+            }
+          }
+          // navigation will be handled by AuthContext listener
+        }
+      } else {
+        logger.warn('No identityToken found from Apple credential');
+        throw new Error('No identityToken found');
+      }
+    } catch (e: any) {
+      if (e.code === 'ERR_REQUEST_CANCELED') {
+        // Handle user canceling the sign-in flow
+        logger.info('User canceled Apple Sign-Up.');
+      } else {
+        Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+        logger.error('Apple Sign-Up error:', { error: e });
+      }
+    } finally {
+      setAppleLoading(false);
+    }
+  }
+
+  /**
    * Dismisses the keyboard when user taps outside input fields
    * Improves user experience on mobile devices
    */
@@ -236,7 +297,7 @@ export default function SignUpScreen() {
             autoCapitalize="words"
             autoComplete="name"
             textContentType="name"
-            editable={!loading && !googleLoading}
+            editable={!loading && !googleLoading && !appleLoading}
           />
           
           <TextInput
@@ -249,7 +310,7 @@ export default function SignUpScreen() {
             keyboardType="email-address"
             autoComplete="email"
             textContentType="emailAddress"
-            editable={!loading && !googleLoading}
+            editable={!loading && !googleLoading && !appleLoading}
           />
           
           <TextInput
@@ -261,7 +322,7 @@ export default function SignUpScreen() {
             secureTextEntry
             autoComplete="new-password"
             textContentType="newPassword"
-            editable={!loading && !googleLoading}
+            editable={!loading && !googleLoading && !appleLoading}
           />
         </View>
 
@@ -270,7 +331,7 @@ export default function SignUpScreen() {
           <TouchableOpacity 
             style={styles.button} 
             onPress={signUpWithEmail} 
-            disabled={loading || googleLoading}
+            disabled={loading || googleLoading || appleLoading}
           >
             {loading ? (
               <ActivityIndicator color="#121820" />
@@ -290,7 +351,7 @@ export default function SignUpScreen() {
           <TouchableOpacity 
             style={styles.googleButton} 
             onPress={signUpWithGoogle}
-            disabled={loading || googleLoading}
+            disabled={loading || googleLoading || appleLoading}
           >
             {googleLoading ? (
               <ActivityIndicator color="#374151" size="small" />
@@ -305,11 +366,24 @@ export default function SignUpScreen() {
             )}
           </TouchableOpacity>
 
+          {/* Apple Sign Up Button */}
+          {appleLoading ? (
+            <ActivityIndicator color="#FFFFFF" style={styles.appleButton} />
+          ) : (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+              cornerRadius={12}
+              style={styles.appleButton}
+              onPress={signUpWithApple}
+            />
+          )}
+
           {/* Navigate to Sign In */}
           <TouchableOpacity 
             style={styles.linkButton} 
             onPress={() => router.push('/(auth)/login' as any)} 
-            disabled={loading || googleLoading}
+            disabled={loading || googleLoading || appleLoading}
           >
             <Text style={styles.linkButtonText}>Already have an account? Sign In</Text>
           </TouchableOpacity>
@@ -440,5 +514,9 @@ const styles = StyleSheet.create({
     color: '#374151', // Dark gray text on white background
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
+  },
+  appleButton: {
+    width: '100%',
+    height: 50,
   },
 }); 

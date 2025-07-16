@@ -13,27 +13,22 @@ import {
 import { supabase } from '../../lib/supabase';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
 import { logger } from '../../lib/logger';
-import { finishOAuth } from '../../lib/finishOAuth';
-import * as AppleAuthentication from 'expo-apple-authentication';
 
 /**
  * SignUpScreen Component
- * Provides user registration through email/password and Google OAuth
- * Simplified authentication flow with only Google and Email options
+ * Provides user registration through email/password only
+ * Social authentication (Google/Apple) is handled on the main onboarding page
  * Implements keyboard dismissal functionality for better UX
  * Creates user profile with full name during registration
  */
 export default function SignUpScreen() {
-  // State management for form inputs and loading states
+  // State management for form inputs and loading state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const [appleLoading, setAppleLoading] = useState(false);
   const router = useRouter();
 
   /**
@@ -147,130 +142,6 @@ export default function SignUpScreen() {
   }
 
   /**
-   * Handles Google OAuth registration using Supabase Auth
-   * Uses expo-web-browser for secure OAuth flow with deep linking
-   * Full-width button design with Google branding
-   * OAuth callback automatically creates user profiles with available data
-   */
-  async function signUpWithGoogle() {
-    logger.info('Initiating Google OAuth sign-up');
-    setGoogleLoading(true);
-    
-    try {
-      const redirectUrl = makeRedirectUri({
-        scheme: 'archie',
-        path: 'success',
-      });
-      
-      logger.info('Using OAuth redirect URL', { redirectUrl });
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectUrl,
-          skipBrowserRedirect: true,
-        },
-      });
-
-      if (error) {
-        logger.error('Google OAuth error', { error: error.message });
-        Alert.alert('Google Sign Up Error', error.message);
-        return;
-      }
-
-      if (data.url) {
-        logger.info('Opening OAuth URL in browser');
-        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
-        
-        if (result.type === 'success') {
-          logger.info('OAuth completed successfully', { 
-            resultType: result.type,
-            url: result.url 
-          });
-
-          // 👉 Exchange the auth code for a session
-          try {
-            await finishOAuth(result.url!, redirectUrl);
-            logger.info('Session obtained after OAuth exchange');
-          } catch (exchangeError) {
-            logger.error('OAuth exchange failed', { exchangeError });
-            Alert.alert('Authentication Error', 'Failed to complete sign up. Please try again.');
-          }
-        } else {
-          logger.info('OAuth was cancelled or failed', { 
-            resultType: result.type,
-            url: (result as any).url 
-          });
-        }
-      }
-    } catch (error) {
-      logger.error('Unexpected Google OAuth error', { error });
-      Alert.alert('Error', 'Failed to sign up with Google. Please try again.');
-    } finally {
-      setGoogleLoading(false);
-    }
-  }
-
-  /**
-   * Handles Apple OAuth registration using Supabase Auth.
-   * Uses expo-apple-authentication for the native sign-in flow.
-   * On first sign-up, it attempts to update the user's profile with their full name.
-   */
-  async function signUpWithApple() {
-    logger.info('Initiating Apple OAuth sign-up');
-    setAppleLoading(true);
-    try {
-      const credential = await AppleAuthentication.signInAsync({
-        requestedScopes: [
-          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-          AppleAuthentication.AppleAuthenticationScope.EMAIL,
-        ],
-      });
-
-      // Check if you received the identity token
-      if (credential.identityToken) {
-        logger.info('Apple sign-in successful, exchanging token with Supabase.');
-        // Sign in with Supabase using the identity token
-        const { data, error } = await supabase.auth.signInWithIdToken({
-          provider: 'apple',
-          token: credential.identityToken,
-        });
-
-        if (error) {
-          Alert.alert('Error', 'Failed to sign up with Apple. Please try again.');
-          logger.error('Supabase sign-in with Apple ID token error:', { error });
-        } else {
-          // Successful sign-in
-          logger.info('Successfully signed up with Apple');
-          if (credential.fullName && data.user) {
-            // If user provides name during first Apple sign up, update their profile.
-            // Subsequent sign ins will not return fullName.
-            const { givenName, familyName } = credential.fullName;
-            const name = [givenName, familyName].filter(Boolean).join(' ');
-            if (name) {
-              await updateUserProfile(data.user.id, name);
-            }
-          }
-          // navigation will be handled by AuthContext listener
-        }
-      } else {
-        logger.warn('No identityToken found from Apple credential');
-        throw new Error('No identityToken found');
-      }
-    } catch (e: any) {
-      if (e.code === 'ERR_REQUEST_CANCELED') {
-        // Handle user canceling the sign-in flow
-        logger.info('User canceled Apple Sign-Up.');
-      } else {
-        Alert.alert('Error', 'An unexpected error occurred. Please try again.');
-        logger.error('Apple Sign-Up error:', { error: e });
-      }
-    } finally {
-      setAppleLoading(false);
-    }
-  }
-
-  /**
    * Dismisses the keyboard when user taps outside input fields
    * Improves user experience on mobile devices
    */
@@ -278,12 +149,20 @@ export default function SignUpScreen() {
     Keyboard.dismiss();
   };
 
+  /**
+   * Navigates back to the main onboarding page
+   */
+  const handleGoBack = () => {
+    logger.info('User navigating back to main onboarding');
+    router.back();
+  };
+
   return (
     <TouchableWithoutFeedback onPress={dismissKeyboard}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.title}>Create Your Blueprint</Text>
-          <Text style={styles.subtitle}>Start your journey of transformation</Text>
+          <Text style={styles.title}>Sign Up with Email</Text>
+          <Text style={styles.subtitle}>Create your account to start your transformation</Text>
         </View>
 
         <View style={styles.inputContainer}>
@@ -297,7 +176,7 @@ export default function SignUpScreen() {
             autoCapitalize="words"
             autoComplete="name"
             textContentType="name"
-            editable={!loading && !googleLoading && !appleLoading}
+            editable={!loading}
           />
           
           <TextInput
@@ -310,7 +189,7 @@ export default function SignUpScreen() {
             keyboardType="email-address"
             autoComplete="email"
             textContentType="emailAddress"
-            editable={!loading && !googleLoading && !appleLoading}
+            editable={!loading}
           />
           
           <TextInput
@@ -322,7 +201,7 @@ export default function SignUpScreen() {
             secureTextEntry
             autoComplete="new-password"
             textContentType="newPassword"
-            editable={!loading && !googleLoading && !appleLoading}
+            editable={!loading}
           />
         </View>
 
@@ -331,7 +210,7 @@ export default function SignUpScreen() {
           <TouchableOpacity 
             style={styles.button} 
             onPress={signUpWithEmail} 
-            disabled={loading || googleLoading || appleLoading}
+            disabled={loading}
           >
             {loading ? (
               <ActivityIndicator color="#121820" />
@@ -340,50 +219,20 @@ export default function SignUpScreen() {
             )}
           </TouchableOpacity>
 
-          {/* Social Sign Up Divider */}
-          <View style={styles.dividerContainer}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>Or</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          {/* Google Sign Up Button - Full Width with Icon */}
+          {/* Navigate back to main onboarding */}
           <TouchableOpacity 
-            style={styles.googleButton} 
-            onPress={signUpWithGoogle}
-            disabled={loading || googleLoading || appleLoading}
+            style={styles.backButton} 
+            onPress={handleGoBack} 
+            disabled={loading}
           >
-            {googleLoading ? (
-              <ActivityIndicator color="#374151" size="small" />
-            ) : (
-              <View style={styles.googleButtonContent}>
-                {/* Google Icon - Using G text as placeholder for actual Google icon */}
-                <View style={styles.googleIcon}>
-                  <Text style={styles.googleIconText}>G</Text>
-                </View>
-                <Text style={styles.googleButtonText}>Continue with Google</Text>
-              </View>
-            )}
+            <Text style={styles.backButtonText}>← Back to sign-up options</Text>
           </TouchableOpacity>
-
-          {/* Apple Sign Up Button */}
-          {appleLoading ? (
-            <ActivityIndicator color="#FFFFFF" style={styles.appleButton} />
-          ) : (
-            <AppleAuthentication.AppleAuthenticationButton
-              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP}
-              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
-              cornerRadius={12}
-              style={styles.appleButton}
-              onPress={signUpWithApple}
-            />
-          )}
 
           {/* Navigate to Sign In */}
           <TouchableOpacity 
             style={styles.linkButton} 
             onPress={() => router.push('/(auth)/login' as any)} 
-            disabled={loading || googleLoading || appleLoading}
+            disabled={loading}
           >
             <Text style={styles.linkButtonText}>Already have an account? Sign In</Text>
           </TouchableOpacity>
@@ -414,6 +263,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Regular',
     color: '#9CA3AF', // Secondary text color
+    textAlign: 'center',
   },
   inputContainer: {
     marginBottom: 20,
@@ -445,6 +295,15 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
   },
+  backButton: {
+    alignItems: 'center',
+    padding: 8,
+  },
+  backButtonText: {
+    color: '#4A90E2', // Secondary accent color for navigation
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+  },
   linkButton: {
     alignItems: 'center',
     padding: 8,
@@ -453,70 +312,5 @@ const styles = StyleSheet.create({
     color: '#9CA3AF', // Secondary text color
     fontFamily: 'Inter-SemiBold',
     fontSize: 14,
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 8,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#374151', // Border color
-  },
-  dividerText: {
-    color: '#9CA3AF', // Secondary text color
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    marginHorizontal: 16,
-  },
-  // Google Button Styles - Full width with white background and icon
-  googleButton: {
-    backgroundColor: '#FFFFFF', // White background for Google branding
-    borderWidth: 1,
-    borderColor: '#DADCE0', // Light gray border similar to Google's design
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 50,
-    // Subtle shadow for depth
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  googleButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  googleIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#4285F4', // Google blue
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  googleIconText: {
-    color: '#FFFFFF',
-    fontFamily: 'Inter-Bold',
-    fontSize: 14,
-  },
-  googleButtonText: {
-    color: '#374151', // Dark gray text on white background
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 16,
-  },
-  appleButton: {
-    width: '100%',
-    height: 50,
   },
 }); 

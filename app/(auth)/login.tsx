@@ -18,6 +18,7 @@ import { makeRedirectUri } from 'expo-auth-session';
 import { logger } from '../../lib/logger';
 import { finishOAuth } from '../../lib/finishOAuth';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import GoogleLogoIcon from '../../components/GoogleLogoIcon';
 
 /**
  * LoginScreen Component
@@ -250,11 +251,11 @@ export default function LoginScreen() {
               <ActivityIndicator color="#374151" size="small" />
             ) : (
               <View style={styles.googleButtonContent}>
-                {/* Google Icon - Using G text as placeholder for actual Google icon */}
-                <View style={styles.googleIcon}>
-                  <Text style={styles.googleIconText}>G</Text>
+                {/* Google Icon - Using official SVG logo */}
+                <View style={styles.googleIconContainer}>
+                  <GoogleLogoIcon />
                 </View>
-                <Text style={styles.googleButtonText}>Continue with Google</Text>
+                <Text style={styles.googleButtonText}>Sign in with Google</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -373,6 +374,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 50,
+    width: '100%',
     // Subtle shadow for depth
     shadowColor: '#000',
     shadowOffset: {
@@ -388,24 +390,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  googleIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#4285F4', // Google blue
-    alignItems: 'center',
-    justifyContent: 'center',
+  googleIconContainer: {
     marginRight: 12,
-  },
-  googleIconText: {
-    color: '#FFFFFF',
-    fontFamily: 'Inter-Bold',
-    fontSize: 14,
   },
   googleButtonText: {
     color: '#374151', // Dark gray text on white background
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 16,
+    fontFamily: 'Inter-Medium',
+    fontSize: 18,
   },
   appleButton: {
     width: '100%',

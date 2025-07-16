@@ -21,56 +21,22 @@ import { logger } from '../../lib/logger';
  * Provides user registration through email/password only
  * Social authentication (Google/Apple) is handled on the main onboarding page
  * Implements keyboard dismissal functionality for better UX
- * Creates user profile with full name during registration
  */
 export default function SignUpScreen() {
   // State management for form inputs and loading state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   /**
-   * Updates the auto-generated user profile row (created by DB trigger) once we
-   * have a valid session. The trigger already ensures a row with matching `id`
-   * exists, so we only need to update the name (and any other metadata).
-   *
-   * NOTE: This is only called when `data.session` is present. If the user
-   * requires email confirmation, we skip this step and handle it after the
-   * first login, avoiding RLS errors when no session is active.
-   * (rule: Security First)
-   */
-  const updateUserProfile = async (userId: string, name: string) => {
-    logger.info('Updating user profile name', { userId, name });
-
-    const { error } = await supabase
-      .from('user_profiles')
-      .update({ full_name: name.trim() })
-      .eq('id', userId);
-
-    if (error) {
-      logger.error('Failed to update user profile name', { userId, error });
-      throw error;
-    }
-
-    logger.info('User profile name updated successfully', { userId });
-  };
-
-  /**
    * Handles email/password registration using Supabase Auth
    * Validates inputs and provides user feedback
-   * Creates user profile after successful authentication
    */
   async function signUpWithEmail() {
-    logger.info('Attempting email sign-up', { email, hasName: !!fullName.trim() });
+    logger.info('Attempting email sign-up', { email });
     
     // Input validation
-    if (!fullName.trim()) {
-      Alert.alert('Name Required', 'Please enter your full name.');
-      return;
-    }
-    
     if (!email.trim()) {
       Alert.alert('Email Required', 'Please enter your email address.');
       return;
@@ -92,9 +58,6 @@ export default function SignUpScreen() {
         password: password,
         options: {
           emailRedirectTo: redirectUrl,
-          data: {
-            full_name: fullName.trim(),
-          },
         },
       });
 
@@ -104,25 +67,15 @@ export default function SignUpScreen() {
         return;
       }
 
-      // Step 2: Create user profile if auth was successful AND we have a session
+      // Step 2: Handle session status after sign-up
       if (data.user) {
         if (data.session) {
-          // ✅ We have a session → RLS allows us to update profile safely
-          try {
-            await updateUserProfile(data.user.id, fullName);
-            logger.info('Email sign-up successful with immediate session');
-            router.replace('/(onboarding)/principles' as any);
-          } catch (profileError) {
-            // Non-fatal: The profile row exists; only name update failed
-            logger.error('Failed to update profile during signup', { 
-              userId: data.user.id, 
-              error: profileError 
-            });
-            router.replace('/(onboarding)/principles' as any);
-          }
+          // ✅ We have a session → user is logged in immediately
+          logger.info('Email sign-up successful with immediate session', { userId: data.user.id });
+          router.replace('/(onboarding)/principles' as any);
         } else {
-          // ✉️ Email confirmation required → skip profile update for now
-          logger.info('Email verification required, profile will be completed after confirmation');
+          // ✉️ Email confirmation required
+          logger.info('Email verification required for user', { userId: data.user.id });
           Alert.alert(
             'Check your email!', 
             'We have sent you a confirmation link to complete your registration. Once verified, sign in to continue.'
@@ -130,7 +83,7 @@ export default function SignUpScreen() {
           router.push('/(auth)/login' as any);
         }
       } else {
-        logger.warn('No user data returned from sign-up');
+        logger.warn('No user data returned from sign-up', { email });
         Alert.alert('Registration Error', 'No user data received. Please try again.');
       }
     } catch (error) {
@@ -166,19 +119,6 @@ export default function SignUpScreen() {
         </View>
 
         <View style={styles.inputContainer}>
-          {/* Full Name Input Field */}
-          <TextInput
-            style={styles.input}
-            placeholder="Full Name"
-            placeholderTextColor="#6B7280"
-            value={fullName}
-            onChangeText={setFullName}
-            autoCapitalize="words"
-            autoComplete="name"
-            textContentType="name"
-            editable={!loading}
-          />
-          
           <TextInput
             style={styles.input}
             placeholder="Email"

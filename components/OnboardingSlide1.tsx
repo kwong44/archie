@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   subtitle: {
-    fontSize: 19,
+    fontSize: 17,
     fontFamily: 'Inter-Regular',
     color: '#F5F5F0', // Primary text color
     textAlign: 'left',

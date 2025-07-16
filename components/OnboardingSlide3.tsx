@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
   },
   // Subtitle styling using Inter-Regular font
   subtitle: {
-    fontSize: 19,
+    fontSize: 17,
     fontFamily: 'Inter-Regular',
     color: '#F5F5F0', // text-primary from color palette
     textAlign: 'center',

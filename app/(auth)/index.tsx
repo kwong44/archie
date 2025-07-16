@@ -171,7 +171,9 @@ export default function OnboardingScreen() {
               await updateUserProfile(data.user.id, name);
             }
           }
-          // navigation will be handled by AuthContext listener
+          // Explicitly redirect to the new welcome screen, overriding the AuthContext listener
+          logger.info('Redirecting to welcome screen after Apple sign-up.');
+          router.replace('/(onboarding)/welcome');
         }
       } else {
         logger.warn('No identityToken found from Apple credential');

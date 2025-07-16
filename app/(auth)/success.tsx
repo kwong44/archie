@@ -99,8 +99,8 @@ export default function SuccessScreen() {
           
           // Auto-redirect to onboarding after a brief delay
           setTimeout(() => {
-            logger.info('Redirecting to onboarding after OAuth success');
-            router.replace('/(onboarding)/principles' as any);
+            logger.info('Redirecting to welcome screen after OAuth success');
+            router.replace('/(onboarding)/welcome' as any);
           }, 2000);
         } else {
           logger.warn('No session found after OAuth callback attempts', { attempts });
@@ -125,8 +125,8 @@ export default function SuccessScreen() {
    */
   const handleContinue = () => {
     if (isVerified) {
-      logger.info('User manually continuing to onboarding from success page');
-      router.replace('/(onboarding)/principles' as any);
+      logger.info('User manually continuing to welcome screen from success page');
+      router.replace('/(onboarding)/welcome' as any);
     } else {
       logger.info('User redirected to login from success page');
       router.replace('/(auth)/login' as any);

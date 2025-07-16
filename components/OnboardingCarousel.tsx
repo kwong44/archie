@@ -3,6 +3,7 @@ import { View, StyleSheet, Dimensions } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import { OnboardingSlide1 } from './OnboardingSlide1';
 import { OnboardingSlide2 } from './OnboardingSlide2';
+import { OnboardingSlide3 } from './OnboardingSlide3';
 import { logger } from '../lib/logger';
 
 // Get device width for proper slide sizing
@@ -23,43 +24,11 @@ export default function OnboardingCarousel(): React.ReactElement {
   // State to track current slide index
   const [currentSlide, setCurrentSlide] = useState<number>(0);
   
-  // Configuration for auto-transition timing (in milliseconds)
-  const SLIDE_DURATION = 6000; // 4 seconds per slide
-  const TOTAL_SLIDES = 2;
-
-  /**
-   * Auto-transition effect that cycles through slides automatically.
-   * Resets timer when currentSlide changes to ensure consistent timing.
-   * (rule: Comment Everything - explain the auto-transition logic)
-   */
-  useEffect(() => {
-    logger.info('Setting up auto-transition timer', { 
-      currentSlide, 
-      duration: SLIDE_DURATION 
-    });
-
-    const timer = setTimeout(() => {
-      const nextSlide = (currentSlide + 1) % TOTAL_SLIDES;
-      
-      logger.info('Auto-transitioning to next slide', { 
-        from: currentSlide, 
-        to: nextSlide 
-      });
-      
-      // Programmatically navigate to next slide
-      pagerRef.current?.setPage(nextSlide);
-      setCurrentSlide(nextSlide);
-    }, SLIDE_DURATION);
-
-    // Cleanup timer on component unmount or slide change
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [currentSlide]);
+  const TOTAL_SLIDES = 3; // Updated to include OnboardingSlide3
 
   /**
    * Handles manual page selection when user swipes.
-   * Updates state to sync with user interaction and restart auto-timer.
+   * Updates state to sync with user interaction.
    * (rule: Comment Everything - explain manual override behavior)
    */
   const handlePageSelected = (event: any): void => {
@@ -91,6 +60,11 @@ export default function OnboardingCarousel(): React.ReactElement {
         {/* Slide 2: Language reframing demonstration */}
         <View key="slide2" style={styles.slide}>
           <OnboardingSlide2 />
+        </View>
+
+        {/* Slide 3: Affirmation and welcome message */}
+        <View key="slide3" style={styles.slide}>
+          <OnboardingSlide3 />
         </View>
       </PagerView>
 

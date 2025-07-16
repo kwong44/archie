@@ -16,7 +16,7 @@ export const OnboardingSlide1: React.FC = () => {
       <View style={styles.header}>
         <Text style={styles.title}>Meet Archie</Text>
         <Text style={styles.subtitle}>
-          Your personal guide to becoming the architect of your own story
+          Your personal guide to becoming the architect of your own reality
         </Text>
       </View>
 
@@ -55,6 +55,9 @@ const styles = StyleSheet.create({
     width: '100%',
     justifyContent: 'center',
     paddingHorizontal: 24,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#374151', // Border color
   },
   header: {
     alignItems: 'flex-start', // Fixed from 'left' to proper FlexAlignType
@@ -70,7 +73,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 19,
     fontFamily: 'Inter-Regular',
-    color: '#9CA3AF', // Secondary text color
+    color: '#F5F5F0', // Primary text color
     textAlign: 'left',
     lineHeight: 26,
   },

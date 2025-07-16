@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { SkiaArt } from './SkiaArt';
+import { DarkSkiaArt } from './DarkSkiaArt';
 
 /**
  * Word pairs used for the interactive reframing demonstration.
@@ -9,7 +9,7 @@ import { SkiaArt } from './SkiaArt';
  */
 const wordPairs = [
   { before: 'Doing', after: 'Experimenting' },
-  { before: 'Rehab', after: 'Renewing' },
+  { before: 'Problem', after: 'Challenge' },
   { before: 'Failure', after: 'Lesson' },
 ];
 
@@ -38,9 +38,9 @@ export const OnboardingSlide2: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Dynamic Skia art background - provides unique visual identity for this slide */}
+      {/* Dynamic DarkSkia art background - provides unique visual identity for this slide */}
       <View style={styles.skiaContainer}>
-        <SkiaArt id="onboarding_power_slide" />
+        <DarkSkiaArt id="onboarding_power_slide" />
       </View>
 
       {/* Overlay content positioned above the Skia background */}
@@ -96,6 +96,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start', // Left-align content
     justifyContent: 'center',
     flex: 1,
+    marginTop: 0,
   },
   title: {
     fontSize: 26,

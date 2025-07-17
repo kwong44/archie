@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -14,29 +14,7 @@ import { logger } from '../../lib/logger';
 import { useAuth } from '../../context/AuthContext';
 import { UserService } from '../../services/userService';
 import { ArrowLeft } from 'lucide-react-native';
-
-// Cake illustration component
-const CakeIllustration = () => (
-  <View style={styles.cakeContainer}>
-    {/* Cake base */}
-    <View style={styles.cakeBase} />
-    
-    {/* Cake layers with different colors */}
-    <View style={[styles.cakeLayer, { backgroundColor: '#A855F7', bottom: 30 }]} />
-    <View style={[styles.cakeLayer, { backgroundColor: '#F3F4F6', bottom: 50 }]} />
-    <View style={[styles.cakeLayer, { backgroundColor: '#84CC16', bottom: 70 }]} />
-    
-    {/* Candles */}
-    <View style={[styles.candle, { left: 45, bottom: 85, backgroundColor: '#F97316' }]} />
-    <View style={[styles.candle, { left: 60, bottom: 85, backgroundColor: '#EF4444' }]} />
-    <View style={[styles.candle, { left: 75, bottom: 85, backgroundColor: '#84CC16' }]} />
-    
-    {/* Flames */}
-    <View style={[styles.flame, { left: 47, bottom: 95 }]} />
-    <View style={[styles.flame, { left: 62, bottom: 95 }]} />
-    <View style={[styles.flame, { left: 77, bottom: 95 }]} />
-  </View>
-);
+import { SkiaArt } from '../../components/SkiaArt';
 
 /**
  * BirthdayScreen Component
@@ -52,6 +30,23 @@ export default function BirthdayScreen() {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+
+  /**
+   * Compute a deterministic seed for SkiaArt based on the selected date.
+   * We memoize it so the expensive hash only recalculates when the user
+   * actually changes a component of the date. (Rule: Performance)
+   */
+  const birthdaySeed = useMemo(() => {
+    if (selectedMonth !== null && selectedDay !== null && selectedYear !== null) {
+      return `${selectedMonth}-${selectedDay}-${selectedYear}`;
+    }
+    return 'birthday_placeholder';
+  }, [selectedMonth, selectedDay, selectedYear]);
+
+  // Debug seed changes in development builds only
+  useEffect(() => {
+    logger.debug('SkiaArt birthday seed updated', { seed: birthdaySeed });
+  }, [birthdaySeed]);
 
   // Date picker data
   const months = [
@@ -82,11 +77,29 @@ export default function BirthdayScreen() {
   }, []);
 
   /**
-   * Handles the back navigation
+   * Navigates back to the previous screen.
+   * If the navigation stack has no previous entry (e.g., user landed
+   * directly on this screen via deep-link or replace()), we perform a
+   * safe fallback by navigating explicitly to the Name step.
    */
   const handleGoBack = () => {
     logger.info('User navigating back from birthday screen');
-    router.back();
+
+    try {
+      // Expo Router exposes history depth via canGoBack(). If a previous
+      // screen exists we can safely pop, otherwise we redirect manually.
+      // NOTE: canGoBack() returns true when history > 1.
+      if (typeof router.canGoBack === 'function' && router.canGoBack()) {
+        router.back();
+      } else {
+        logger.info('No previous screen in navigation stack – redirecting to name screen');
+        router.replace('/(onboarding)/name' as any);
+      }
+    } catch (err) {
+      // Last-resort fallback: ensure user is not stuck.
+      logger.warn('router.back() threw, redirecting to name screen', { error: String(err) });
+      router.replace('/(onboarding)/name' as any);
+    }
   };
 
   /**
@@ -134,8 +147,8 @@ export default function BirthdayScreen() {
     try {
       await UserService.updateUserBirthday(userId, birthdayString);
       logger.info("User birthday updated successfully.", { userId });
-      // Navigate to the next step in onboarding (gender selection)
-      router.replace('/(onboarding)/gender' as any);
+      // Navigate to the next step in onboarding (gender selection) using push to maintain history
+      router.push('/(onboarding)/gender' as any);
     } catch (error) {
       logger.error('Failed to update user birthday', { userId, error });
       Alert.alert("Error", "Could not save your birthday. Please try again.");
@@ -150,11 +163,17 @@ export default function BirthdayScreen() {
         <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
           <ArrowLeft color="#F5F5F0" size={24} />
         </TouchableOpacity>
-        
+        {/* Progress row with track, text, skip button */}
         <View style={styles.progressContainer}>
-          <View style={styles.progressBar} />
+          {/* Grey track */}
+          <View style={styles.progressTrack}>
+            {/* Green fill – 40% for step 2/5 */}
+            <View style={styles.progressFill} />
+          </View>
+          {/* Step text */}
           <Text style={styles.progressText}>2/5</Text>
-          <TouchableOpacity onPress={() => router.replace('/(onboarding)/gender' as any)}>
+          {/* Skip */}
+          <TouchableOpacity onPress={() => router.push('/(onboarding)/gender' as any)}>
             <Text style={styles.skipText}>skip</Text>
           </TouchableOpacity>
         </View>
@@ -167,7 +186,10 @@ export default function BirthdayScreen() {
           celebrate you?
         </Text>
         
-        <CakeIllustration />
+        {/* Circular generative art uniquely representing the selected birthday */}
+        <View style={styles.skiaArtCircle}>
+          <SkiaArt id={birthdaySeed} />
+        </View>
 
         {/* Date Picker Interface */}
         <View style={styles.datePickerContainer}>
@@ -283,7 +305,6 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingTop: 10,
     paddingBottom: 20,
   },
@@ -294,22 +315,26 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
+    marginLeft: 8,
   },
-  progressBar: {
-    position: 'absolute',
-    left: 20,
+  progressTrack: {
+    flex: 1,
     height: 4,
-    backgroundColor: '#A7F3D0',
-    width: '40%', // 2/5 progress
+    backgroundColor: '#374151',
     borderRadius: 2,
+    overflow: 'hidden',
+    marginRight: 8,
+  },
+  progressFill: {
+    height: '100%',
+    width: '40%',
+    backgroundColor: '#A7F3D0',
   },
   progressText: {
     fontFamily: 'Inter-Regular',
     fontSize: 14,
     color: '#F5F5F0',
-    marginRight: 10,
+    marginRight: 16,
   },
   skipText: {
     fontFamily: 'Inter-Regular',
@@ -329,41 +354,6 @@ const styles = StyleSheet.create({
     marginBottom: 40,
     textTransform: 'lowercase',
     lineHeight: 34,
-  },
-  cakeContainer: {
-    width: 120,
-    height: 100,
-    position: 'relative',
-    marginBottom: 60,
-  },
-  cakeBase: {
-    position: 'absolute',
-    bottom: 0,
-    left: 20,
-    width: 80,
-    height: 30,
-    backgroundColor: '#8B4513',
-    borderRadius: 4,
-  },
-  cakeLayer: {
-    position: 'absolute',
-    left: 25,
-    width: 70,
-    height: 20,
-    borderRadius: 10,
-  },
-  candle: {
-    position: 'absolute',
-    width: 3,
-    height: 15,
-    borderRadius: 1.5,
-  },
-  flame: {
-    position: 'absolute',
-    width: 6,
-    height: 8,
-    backgroundColor: '#FFA500',
-    borderRadius: 3,
   },
   datePickerContainer: {
     flexDirection: 'row',
@@ -422,5 +412,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#121820',
     textTransform: 'lowercase',
+  },
+  // Replaces cake illustration with a circular generative art canvas
+  skiaArtCircle: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    overflow: 'hidden',
+    marginBottom: 40,
+    borderWidth: 1,
+    borderColor: '#374151',
   },
 }); 

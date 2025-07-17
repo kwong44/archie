@@ -183,7 +183,8 @@ export default function LexiconSetupScreen() {
       // Refresh auth context onboarding status
       await checkOnboardingStatus();
       
-      // Navigation will be handled automatically by the root layout
+      // Navigate user to reminder setup (daily motivation) before landing on main tabs
+      router.replace('/(tabs)/reminder-setup' as any);
       
     } catch (error) {
       console.error('❌ Failed to complete onboarding:', error);

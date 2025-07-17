@@ -15,13 +15,7 @@ import { logger } from '../../lib/logger';
 import { useAuth } from '../../context/AuthContext';
 import { UserService } from '../../services/userService';
 import { ArrowRight } from 'lucide-react-native';
-
-// This is a placeholder for the animated character
-const CharacterPlaceholder = () => (
-  <View style={styles.characterPlaceholder}>
-    <Text style={{fontSize: 100}}>🌞</Text>
-  </View>
-);
+import { SkiaArt } from '../../components/SkiaArt';
 
 /**
  * NameScreen Component
@@ -73,8 +67,8 @@ export default function NameScreen() {
     try {
       await UserService.updateUserProfileName(userId, name.trim());
       logger.info("User name updated successfully.", { userId });
-      // Navigate to the next step in onboarding - birthday screen
-      router.replace('/(onboarding)/birthday' as any);
+      // Navigate to the next step in onboarding - birthday screen using push to allow back navigation
+      router.push('/(onboarding)/birthday' as any);
     } catch (error) {
       logger.error('Failed to update user name', { userId, error });
       Alert.alert("Error", "Could not save your name. Please try again.");
@@ -83,20 +77,41 @@ export default function NameScreen() {
     }
   };
 
+  /**
+   * Log every time the name changes so we can visually debug seed changes
+   * in the SkiaArt component. (Rule: Logging)
+   */
+  useEffect(() => {
+    logger.debug('SkiaArt seed updated', { seed: name });
+  }, [name]);
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* Progress bar row matching design: track with fill, progress text, skip */}
       <View style={styles.progressContainer}>
-        <View style={styles.progressBar} />
+        {/* Grey track background */}
+        <View style={styles.progressTrack}>
+          {/* Green fill representing current progress */}
+          <View style={styles.progressFill} />
+        </View>
+
+        {/* Current step text */}
         <Text style={styles.progressText}>1/5</Text>
-        <TouchableOpacity onPress={() => router.replace('/(onboarding)/birthday' as any)}>
-            <Text style={styles.skipText}>skip</Text>
+
+        {/* Skip button */}
+        <TouchableOpacity onPress={() => router.push('/(onboarding)/birthday' as any)}>
+          <Text style={styles.skipText}>skip</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.mainContent}>
         <Text style={styles.title}>What should Archie call you?</Text>
         
-        <CharacterPlaceholder />
+        {/* Dynamic generative art seeded by the user's input */}
+        <View style={styles.skiaArtContainer}>
+          {/* Fallback seed ensures deterministic art before the user types */}
+          <SkiaArt id={name || 'name_placeholder'} />
+        </View>
 
         <TextInput
           ref={textInputRef}
@@ -131,42 +146,42 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 10,
-    paddingBottom: 20,
+    flexDirection: 'row', // Horizontal layout
+    alignItems: 'center', // Vertical centering
+    marginTop: 10,
+    marginBottom: 20,
+    marginLeft: 40, // Offset to match layout where a back button would occupy space
   },
-  progressBar: {
-    position: 'absolute',
-    top: 10,
-    left: 0,
+  progressTrack: {
+    flex: 1, // Take up remaining space
     height: 4,
-    backgroundColor: '#A7F3D0',
-    width: '20%', 
+    backgroundColor: '#374151', // Grey background track
     borderRadius: 2,
+    overflow: 'hidden', // Ensure fill stays within track
+    marginRight: 8, // Space between track and text
+  },
+  progressFill: {
+    height: '100%',
+    width: '20%', // 20% progress (1/5)
+    backgroundColor: '#A7F3D0', // Green fill
   },
   progressText: {
-    position: 'absolute',
-    right: 50,
-    top: 5,
     fontFamily: 'Inter-Regular',
     fontSize: 14,
     color: '#F5F5F0',
+    marginRight: 16,
   },
   skipText: {
     fontFamily: 'Inter-Regular',
     fontSize: 16,
     color: '#9CA3AF',
-    position: 'absolute',
-    right: 0,
-    top: 5,
   },
   mainContent: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingBottom: 100, // Offset for keyboard
+    justifyContent: 'flex-start', // Start from top to showcase art & prompt
+    paddingTop: 40,
+    paddingBottom: 0,
   },
   title: {
     fontFamily: 'Inter-SemiBold',
@@ -174,14 +189,16 @@ const styles = StyleSheet.create({
     color: '#F5F5F0',
     textAlign: 'center',
     marginBottom: 40,
-    textTransform: 'lowercase',
   },
-  characterPlaceholder: {
+  skiaArtContainer: {
     width: 200,
     height: 150,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 40,
+    // Attempt to give the container a slightly diagonal feel – this creates
+    // a subtle dynamic edge without resorting to complex clipping masks.
+    transform: [{ rotate: '-5deg' }],
   },
   input: {
     fontFamily: 'Inter-Bold',

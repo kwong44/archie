@@ -168,7 +168,7 @@ const GuideScreen: React.FC = () => {
       title: 'Personal',
       items: [
         { icon: User, label: 'Profile', description: 'Manage your info' },
-        { icon: Bell, label: 'Notifications', description: 'Customize reminders' },
+        { icon: Bell, label: 'Notifications', description: 'Customize reminders', onPress: () => router.push('/notification-settings' as any) },
         { icon: Moon, label: 'Preferences', description: 'Theme & display' },
       ],
     },

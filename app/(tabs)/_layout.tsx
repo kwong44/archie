@@ -71,6 +71,15 @@ export default function TabLayout() {
           ),
         }}
       />
+      {/* Hidden screen for daily reminder setup - not shown in tab bar */}
+      <Tabs.Screen
+        name="reminder-setup"
+        options={{
+          href: null, // Exclude from deep linking & tab list
+          headerShown: false,
+          tabBarButton: () => null,
+        }}
+      />
       {/* Guide tab removed from Tab Navigator to free space */}
     </Tabs>
   );

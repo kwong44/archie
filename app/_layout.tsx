@@ -132,6 +132,7 @@ function RootLayoutNav() {
       <Stack.Screen name="reframe" options={{ headerShown: false }} />
       <Stack.Screen name="paywall" options={{ headerShown: false }} />
       <Stack.Screen name="entry-detail" options={{ headerShown: false }} />
+      <Stack.Screen name="notification-settings" options={{ headerShown: false }} />
       <Stack.Screen name="+not-found" />
     </Stack>
   );

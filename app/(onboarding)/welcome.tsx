@@ -25,7 +25,7 @@ export default function WelcomeScreen() {
 
     try {
       await UserService.markWelcomeAsSeen();
-      router.replace('/(onboarding)/name' as any);
+      router.push('/(onboarding)/name' as any);
     } catch (error) {
       logger.error('Failed to mark welcome as seen', { error });
       Alert.alert(
@@ -41,8 +41,8 @@ export default function WelcomeScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.mainContent}>
-        <Text style={styles.congratsText}>Your journey begins</Text>
-        <Text style={styles.nowText}>now</Text>
+        <Text style={styles.congratsText}>Congrats you are</Text>
+        <Text style={styles.largeText}>here</Text>
       </View>
       <View style={styles.footer}>
         <TouchableOpacity style={styles.button} onPress={handleContinue} activeOpacity={0.8} disabled={loading}>
@@ -75,14 +75,15 @@ const styles = StyleSheet.create({
     color: '#6D28D9',
     textAlign: 'center',
   },
-  nowText: {
+  largeText: {
     alignSelf: 'flex-end',
     fontSize: 100,
     fontFamily: 'Inter-Bold',
     color: '#6D28D9',
     lineHeight: 160,
-    textAlign: 'right',
-    marginTop: -50,
+    textAlign: 'center',
+    marginTop: -30,
+    marginRight: 20,
     justifyContent: 'flex-end',
   },
   footer: {

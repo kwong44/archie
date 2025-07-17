@@ -133,7 +133,7 @@ export default function PrinciplesScreen() {
       
       console.log('🎯 Principles saved successfully, navigating to lexicon setup');
       
-      // Navigate to lexicon setup
+      // Navigate to lexicon setup using push (already push)
       router.push('/(onboarding)/lexicon-setup' as any);
       
     } catch (error) {
@@ -180,9 +180,11 @@ export default function PrinciplesScreen() {
         <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
           <ArrowLeft color="#F5F5F0" size={24} />
         </TouchableOpacity>
-        
+        {/* Progress row: track, text, skip */}
         <View style={styles.progressContainer}>
-          <View style={styles.progressBar} />
+          <View style={styles.progressTrack}>
+            <View style={styles.progressFill} />
+          </View>
           <Text style={styles.progressText}>4/5</Text>
           <TouchableOpacity onPress={handleSkip} disabled={isSaving}>
             <Text style={styles.skipText}>skip</Text>
@@ -252,7 +254,6 @@ const styles = StyleSheet.create({
   headerNavigation: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingTop: 10,
     paddingBottom: 20,
   },
@@ -263,22 +264,26 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
+    marginLeft: 8,
   },
-  progressBar: {
-    position: 'absolute',
-    left: 20,
+  progressTrack: {
+    flex: 1,
     height: 4,
-    backgroundColor: '#A7F3D0',
-    width: '80%', // 4/5 progress
+    backgroundColor: '#374151',
     borderRadius: 2,
+    overflow: 'hidden',
+    marginRight: 8,
+  },
+  progressFill: {
+    height: '100%',
+    width: '80%', // 4/5 progress
+    backgroundColor: '#A7F3D0',
   },
   progressText: {
     fontFamily: 'Inter-Regular',
     fontSize: 14,
     color: '#F5F5F0',
-    marginRight: 10,
+    marginRight: 16,
   },
   skipText: {
     fontFamily: 'Inter-Regular',

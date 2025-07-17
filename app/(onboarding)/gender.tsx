@@ -89,8 +89,8 @@ export default function GenderScreen() {
         gender: selectedGender 
       });
 
-      // Navigate to next onboarding step (principles screen)
-      router.replace('/(onboarding)/principles' as any);
+      // Navigate to next onboarding step (principles screen) using push to maintain back history
+      router.push('/(onboarding)/principles' as any);
     } catch (error) {
       logger.error('Failed to save gender selection', { 
         userId: session.user.id, 
@@ -113,7 +113,7 @@ export default function GenderScreen() {
    */
   const handleSkip = (): void => {
     logger.info('Gender selection skipped', { userId: session?.user?.id });
-    router.replace('/(onboarding)/principles' as any);
+    router.push('/(onboarding)/principles' as any);
   };
 
   return (
@@ -123,9 +123,11 @@ export default function GenderScreen() {
         <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
           <ArrowLeft color="#F5F5F0" size={24} />
         </TouchableOpacity>
-        
+        {/* Progress row: track with fill, step text, skip */}
         <View style={styles.progressContainer}>
-          <View style={styles.progressBar} />
+          <View style={styles.progressTrack}>
+            <View style={styles.progressFill} />
+          </View>
           <Text style={styles.progressText}>3/5</Text>
           <TouchableOpacity onPress={handleSkip}>
             <Text style={styles.skipText}>skip</Text>
@@ -197,7 +199,6 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingTop: 10,
     paddingBottom: 20,
   },
@@ -208,22 +209,26 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
+    marginLeft: 8,
   },
-  progressBar: {
-    position: 'absolute',
-    left: 20,
+  progressTrack: {
+    flex: 1,
     height: 4,
-    backgroundColor: '#A7F3D0',
-    width: '60%', // 3/5 progress
+    backgroundColor: '#374151',
     borderRadius: 2,
+    overflow: 'hidden',
+    marginRight: 8,
+  },
+  progressFill: {
+    height: '100%',
+    width: '60%', // 3/5 progress
+    backgroundColor: '#A7F3D0',
   },
   progressText: {
     fontFamily: 'Inter-Regular',
     fontSize: 14,
     color: '#F5F5F0',
-    marginRight: 10,
+    marginRight: 16,
   },
   skipText: {
     fontFamily: 'Inter-Regular',

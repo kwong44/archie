@@ -72,7 +72,7 @@ export default function SignUpScreen() {
         if (data.session) {
           // ✅ We have a session → user is logged in immediately
           logger.info('Email sign-up successful with immediate session', { userId: data.user.id });
-          router.replace('/(onboarding)/principles' as any);
+          router.replace('/(onboarding)/welcome' as any);
         } else {
           // ✉️ Email confirmation required
           logger.info('Email verification required for user', { userId: data.user.id });

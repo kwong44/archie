@@ -7,6 +7,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { createContextLogger } from '../lib/logger';
 import { SubscriptionService } from '@/services/subscriptionService';
+import { UserService } from '@/services/userService';
 import { PostHogProvider } from 'posthog-react-native';
 import Constants from 'expo-constants';
 import * as Linking from 'expo-linking';
@@ -95,9 +96,21 @@ function RootLayoutNav() {
       return;
     } else if (session && onboardingCompleted === false) {
       // User is authenticated but hasn't completed onboarding
+      // Determine which onboarding step they should be on
       if (!inOnboardingGroup && !onSuccessScreen) {
-        navLogger.info('Redirecting to onboarding - session exists but onboarding incomplete');
-        router.replace('/(onboarding)/principles');
+        navLogger.info('Redirecting to appropriate onboarding step - session exists but onboarding incomplete');
+        
+        // Use UserService to determine the correct onboarding step
+        UserService.getNextOnboardingStep()
+          .then((nextStep) => {
+            navLogger.info('Redirecting to determined onboarding step', { nextStep });
+            router.replace(nextStep as any);
+          })
+          .catch((error) => {
+            navLogger.error('Failed to determine onboarding step, defaulting to name', { error });
+            // Fallback to name step if there's an error
+            router.replace('/(onboarding)/name');
+          });
       }
     } else if (session && onboardingCompleted === true) {
       // User is authenticated and has completed onboarding

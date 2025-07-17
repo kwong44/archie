@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { ArrowLeft } from 'lucide-react-native';
 import { useAuth } from '@/context/AuthContext';
 import { OnboardingService } from '@/services/onboardingService';
 
@@ -70,6 +71,14 @@ export default function PrinciplesScreen() {
   const { session } = useAuth();
   const [selectedPrinciples, setSelectedPrinciples] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+
+  /**
+   * Handles the back navigation
+   */
+  const handleGoBack = () => {
+    console.log('🔙 User navigating back from principles screen');
+    router.back();
+  };
 
   /**
    * Toggles selection of a principle
@@ -165,18 +174,24 @@ export default function PrinciplesScreen() {
   const isButtonDisabled = selectedPrinciples.length < 3 || isSaving;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity 
-            style={styles.skipButton} 
-            onPress={handleSkip}
-            disabled={isSaving}
-          >
-            <Text style={styles.skipButtonText}>Skip</Text>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* Header with back button, progress bar, and skip */}
+      <View style={styles.headerNavigation}>
+        <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
+          <ArrowLeft color="#F5F5F0" size={24} />
+        </TouchableOpacity>
+        
+        <View style={styles.progressContainer}>
+          <View style={styles.progressBar} />
+          <Text style={styles.progressText}>4/5</Text>
+          <TouchableOpacity onPress={handleSkip} disabled={isSaving}>
+            <Text style={styles.skipText}>skip</Text>
           </TouchableOpacity>
         </View>
-        
+      </View>
+
+      {/* Content Header */}
+      <View style={styles.header}>
         <Text style={styles.title}>Define Your Principles</Text>
         <Text style={styles.subtitle}>
           Select the core beliefs that will guide your transformation. Choose at least three.
@@ -232,29 +247,47 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#121820', // Primary background color
+    paddingHorizontal: 20,
+  },
+  headerNavigation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 10,
+    paddingBottom: 20,
+  },
+  backButton: {
+    padding: 8,
+  },
+  progressContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  progressBar: {
+    position: 'absolute',
+    left: 20,
+    height: 4,
+    backgroundColor: '#A7F3D0',
+    width: '80%', // 4/5 progress
+    borderRadius: 2,
+  },
+  progressText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#F5F5F0',
+    marginRight: 10,
+  },
+  skipText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 16,
+    color: '#9CA3AF',
   },
   header: {
     padding: 20,
     alignItems: 'center',
-  },
-  headerTop: {
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginBottom: 16,
-  },
-  skipButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(156, 163, 175, 0.1)',
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-  skipButtonText: {
-    color: '#9CA3AF', // Secondary text color
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
   },
   title: {
     fontSize: 32,

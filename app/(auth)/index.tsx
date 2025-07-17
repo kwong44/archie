@@ -41,32 +41,6 @@ export default function OnboardingScreen() {
   }
 
   /**
-   * Updates the auto-generated user profile row (created by DB trigger) once we
-   * have a valid session. The trigger already ensures a row with matching `id`
-   * exists, so we only need to update the name (and any other metadata).
-   *
-   * NOTE: This is only called when `data.session` is present. If the user
-   * requires email confirmation, we skip this step and handle it after the
-   * first login, avoiding RLS errors when no session is active.
-   * (rule: Security First)
-   */
-  const updateUserProfile = async (userId: string, name: string) => {
-    logger.info('Updating user profile name', { userId, name });
-
-    const { error } = await supabase
-      .from('user_profiles')
-      .update({ full_name: name.trim() })
-      .eq('id', userId);
-
-    if (error) {
-      logger.error('Failed to update user profile name', { userId, error });
-      throw error;
-    }
-
-    logger.info('User profile name updated successfully', { userId });
-  };
-
-  /**
    * Handles Google OAuth registration using Supabase Auth
    * Uses expo-web-browser for secure OAuth flow with deep linking
    * Full-width button design with Google branding
@@ -112,6 +86,9 @@ export default function OnboardingScreen() {
           try {
             await finishOAuth(result.url!, redirectUrl);
             logger.info('Session obtained after OAuth exchange');
+            // After successful OAuth, we now redirect to the welcome screen,
+            // which then leads to the name screen.
+            router.replace('/(onboarding)/welcome');
           } catch (exchangeError) {
             logger.error('OAuth exchange failed', { exchangeError });
             Alert.alert('Authentication Error', 'Failed to complete sign up. Please try again.');
@@ -162,15 +139,7 @@ export default function OnboardingScreen() {
         } else {
           // Successful sign-in
           logger.info('Successfully signed up with Apple');
-          if (credential.fullName && data.user) {
-            // If user provides name during first Apple sign up, update their profile.
-            // Subsequent sign ins will not return fullName.
-            const { givenName, familyName } = credential.fullName;
-            const name = [givenName, familyName].filter(Boolean).join(' ');
-            if (name) {
-              await updateUserProfile(data.user.id, name);
-            }
-          }
+          // Name collection is now handled on a dedicated screen after this.
           // Explicitly redirect to the new welcome screen, overriding the AuthContext listener
           logger.info('Redirecting to welcome screen after Apple sign-up.');
           router.replace('/(onboarding)/welcome');

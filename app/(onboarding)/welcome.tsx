@@ -1,8 +1,9 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { logger } from '../../lib/logger';
+import { UserService } from '@/services/userService';
 
 /**
  * WelcomeScreen Component
@@ -12,25 +13,44 @@ import { logger } from '../../lib/logger';
  */
 export default function WelcomeScreen() {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
   /**
    * Handles the continue button press.
-   * Navigates the user to the next step in the onboarding flow (principles setup).
+   * Marks the welcome screen as seen and navigates to the name entry screen.
    */
-  const handleContinue = () => {
-    logger.info('User continuing from welcome screen to principles setup.');
-    router.replace('/(onboarding)/principles');
+  const handleContinue = async () => {
+    setLoading(true);
+    logger.info('User continuing from welcome screen to name setup.');
+
+    try {
+      await UserService.markWelcomeAsSeen();
+      router.replace('/(onboarding)/name' as any);
+    } catch (error) {
+      logger.error('Failed to mark welcome as seen', { error });
+      Alert.alert(
+        'Error', 
+        'Could not proceed with onboarding. Please try again.',
+        [{ text: 'OK' }]
+      );
+      setLoading(false);
+    }
+    // No need to set loading to false on success, as we are navigating away
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.mainContent}>
-        <Text style={styles.congratsText}>congrats you are</Text>
-        <Text style={styles.inText}>in</Text>
+        <Text style={styles.congratsText}>Your journey begins</Text>
+        <Text style={styles.nowText}>now</Text>
       </View>
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.button} onPress={handleContinue} activeOpacity={0.8}>
-          <Text style={styles.buttonText}>let's make pillowtalk yours</Text>
+        <TouchableOpacity style={styles.button} onPress={handleContinue} activeOpacity={0.8} disabled={loading}>
+          {loading ? (
+            <ActivityIndicator color="#1F2937" />
+          ) : (
+            <Text style={styles.buttonText}>Let's get to know you</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -55,20 +75,22 @@ const styles = StyleSheet.create({
     color: '#6D28D9',
     textAlign: 'center',
   },
-  inText: {
-    fontSize: 150,
+  nowText: {
+    alignSelf: 'flex-end',
+    fontSize: 100,
     fontFamily: 'Inter-Bold',
     color: '#6D28D9',
     lineHeight: 160,
-    textAlign: 'center',
-    marginTop: -20,
+    textAlign: 'right',
+    marginTop: -50,
+    justifyContent: 'flex-end',
   },
   footer: {
     justifyContent: 'flex-end',
   },
   button: {
     backgroundColor: '#F3F4F6',
-    borderRadius: 30,
+    borderRadius: 16,
     paddingVertical: 18,
     paddingHorizontal: 30,
     alignItems: 'center',
@@ -86,6 +108,5 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     fontSize: 16,
     fontFamily: 'Inter-SemiBold',
-    textTransform: 'lowercase',
   },
 }); 

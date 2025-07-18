@@ -13,6 +13,7 @@ const COMPONENT_BG = '#1F2937';
 const BORDER_COLOR = '#374151';
 const TEXT_PRIMARY = '#F5F5F0';
 const TEXT_SECONDARY = '#9CA3AF';
+const TEXT_TERTIARY = '#6B7280';
 
 interface TimeOptionDef {
   slot: ReminderTimeSlot;

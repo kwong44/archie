@@ -57,7 +57,7 @@ export default function ReminderSetupScreen() {
     try {
       await NotificationService.scheduleDailyReminder(selectedSlot);
       Alert.alert('All set!', 'We\'ll remind you daily.');
-      router.replace('/(tabs)');
+      router.replace('/personalizing' as any);
     } catch (err) {
       screenLogger.error('Failed to enable notifications', { error: (err as Error).message });
       Alert.alert(
@@ -71,7 +71,7 @@ export default function ReminderSetupScreen() {
 
   const handleSetupLater = () => {
     screenLogger.trackUserAction('setup_later_pressed', 'notifications', undefined, session?.user?.id);
-    router.replace('/(tabs)');
+    router.replace('/personalizing' as any);
   };
 
   return (

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Session } from '@supabase/supabase-js';
 import { createContextLogger } from '../lib/logger';
+import { SubscriptionService } from '@/services/subscriptionService';
 
 // Create a context-specific logger for authentication workflows
 const authLogger = createContextLogger('AuthContext');
@@ -129,10 +130,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         });
         setSession(session);
         if (session) {
+          // Link RevenueCat to this user for accurate entitlement tracking
+          SubscriptionService.setUserID(session.user.id).catch((err) =>
+            authLogger.error('Failed to set RevenueCat user ID on auth state change', { error: String(err) })
+          );
+
           // When user signs in, check their onboarding status
           checkOnboardingStatus();
         } else {
           // When user signs out, reset onboarding status
+          // Ensure we also sign out of RevenueCat to clear cached entitlements
+          SubscriptionService.signOut().catch((err) =>
+            authLogger.error('Failed to sign out from RevenueCat on auth sign out', { error: String(err) })
+          );
           setOnboardingCompleted(null);
         }
       }
@@ -161,6 +171,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       authLogger.info('Clearing session manually');
       try {
         await supabase.auth.signOut();
+        // Also sign the user out from RevenueCat
+        await SubscriptionService.signOut();
       } catch (signOutError) {
         authLogger.error('Error during manual sign out', {
           error: signOutError instanceof Error ? signOutError.message : 'Unknown signout error'

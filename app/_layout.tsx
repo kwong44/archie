@@ -133,6 +133,9 @@ function RootLayoutNav() {
       <Stack.Screen name="paywall" options={{ headerShown: false }} />
       <Stack.Screen name="entry-detail" options={{ headerShown: false }} />
       <Stack.Screen name="notification-settings" options={{ headerShown: false }} />
+      <Stack.Screen name="personalizing" options={{ headerShown: false }} />
+      <Stack.Screen name="trial-intro" options={{ headerShown: false }} />
+      <Stack.Screen name="all-plans" options={{ headerShown: false }} />
       <Stack.Screen name="+not-found" />
     </Stack>
   );
@@ -171,6 +174,7 @@ export default function RootLayout() {
         const revenueCatApiKey = Constants.expoConfig?.extra?.revenueCatApiKey;
         
         if (revenueCatApiKey) {
+          navLogger.debug('RevenueCat key snippet', { keyPrefix: revenueCatApiKey.slice(0, 10) });
           navLogger.info('Initializing RevenueCat');
           await SubscriptionService.initialize(revenueCatApiKey);
           navLogger.info('RevenueCat initialized successfully');

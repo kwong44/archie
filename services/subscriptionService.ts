@@ -5,7 +5,13 @@ import { logger } from '@/lib/logger';
  * Subscription tiers available in the app
  */
 export enum SubscriptionTier {
+  /**
+   * FREE tier represents users without any active subscription.
+   * This value is used as a safe fallback whenever no premium entitlement is detected.
+   */
   FREE = 'free',
+  TRIAL = 'trial',
+  PREMIUM_WEEKLY = 'premium_weekly',
   PREMIUM_MONTHLY = 'premium_monthly',
   PREMIUM_YEARLY = 'premium_yearly'
 }
@@ -116,12 +122,17 @@ export class SubscriptionService {
       
       // Determine subscription tier based on product ID
       let tier: SubscriptionTier;
-      if (productId.includes('monthly')) {
+      if (productId.includes('trial')) {
+        tier = SubscriptionTier.TRIAL;
+      } else if (productId.includes('weekly')) {
+        tier = SubscriptionTier.PREMIUM_WEEKLY;
+      } else if (productId.includes('monthly')) {
         tier = SubscriptionTier.PREMIUM_MONTHLY;
       } else if (productId.includes('yearly')) {
         tier = SubscriptionTier.PREMIUM_YEARLY;
       } else {
-        tier = SubscriptionTier.PREMIUM_MONTHLY; // Default fallback
+        // If product identifier doesn't match known tiers, fall back to MONTHLY to minimise feature lockouts
+        tier = SubscriptionTier.PREMIUM_MONTHLY;
       }
 
       const status: SubscriptionStatus = {

@@ -24,9 +24,9 @@ interface TimeOption {
 }
 
 const TIME_OPTIONS: TimeOption[] = [
-  { slot: 'morning', label: 'morning', icon: Sun, displayTime: '8:03 AM' },
-  { slot: 'day', label: 'day', icon: Flower, displayTime: '3:41 PM' },
-  { slot: 'evening', label: 'evening', icon: Moon, displayTime: '8:22 PM' },
+  { slot: 'morning', label: 'morning', icon: Sun, displayTime: '8:00 AM' },
+  { slot: 'day', label: 'day', icon: Flower, displayTime: '3:00 PM' },
+  { slot: 'evening', label: 'evening', icon: Moon, displayTime: '7:00 PM' },
 ];
 
 /**
@@ -76,58 +76,60 @@ export default function ReminderSetupScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.headerContainer}>
-        <Text style={styles.headerTitle}>nice! small steps lead to{"\n"}big results.</Text>
-        <Text style={styles.headerSubtitle}>what time feels best for your me-time?</Text>
-      </View>
+      <View style={styles.innerContainer}>
+        {/* Header */}
+        <View style={styles.headerContainer}>
+          <Text style={styles.headerTitle}>Your journaling routine is near</Text>
+          <Text style={styles.headerSubtitle}>When would you like to receive your gentle reminder?</Text>
+        </View>
 
-      {/* Time Options */}
-      <View style={styles.optionsContainer}>
-        {TIME_OPTIONS.map((opt) => {
-          const IconComp = opt.icon;
-          const isSelected = selectedSlot === opt.slot;
-          return (
-            <View key={opt.slot} style={styles.optionColumn}>
-              {/* Icon */}
-              <IconComp color={ACCENT_PRIMARY} size={28} />
-              {/* Label */}
-              <Text style={styles.optionLabel}>{opt.label}</Text>
-              {/* Time display */}
-              <View style={styles.timeBubble}>
-                <Text style={styles.timeText}>{opt.displayTime}</Text>
+        {/* Time Options */}
+        <View style={styles.optionsContainer}>
+          {TIME_OPTIONS.map((opt) => {
+            const IconComp = opt.icon;
+            const isSelected = selectedSlot === opt.slot;
+            return (
+              <View key={opt.slot} style={styles.optionColumn}>
+                {/* Icon */}
+                <IconComp color={ACCENT_PRIMARY} size={28} />
+                {/* Label */}
+                <Text style={styles.optionLabel}>{opt.label}</Text>
+                {/* Time display */}
+                <View style={styles.timeBubble}>
+                  <Text style={styles.timeText}>{opt.displayTime}</Text>
+                </View>
+                {/* Switch */}
+                <Switch
+                  value={isSelected}
+                  onValueChange={() => handleToggle(opt.slot)}
+                  thumbColor={isSelected ? '#121820' : '#FFFFFF'}
+                  trackColor={{ true: ACCENT_PRIMARY, false: BORDER_COLOR }}
+                />
               </View>
-              {/* Switch */}
-              <Switch
-                value={isSelected}
-                onValueChange={() => handleToggle(opt.slot)}
-                thumbColor={isSelected ? '#121820' : '#FFFFFF'}
-                trackColor={{ true: ACCENT_PRIMARY, false: BORDER_COLOR }}
-              />
-            </View>
-          );
-        })}
-      </View>
+            );
+          })}
+        </View>
 
-      {/* Action Buttons */}
-      <View style={styles.buttonContainer}>
-        {/* Setup later */}
-        <TouchableOpacity style={styles.laterButton} onPress={handleSetupLater} disabled={processing}>
-          <Text style={styles.laterButtonText}>set up later</Text>
-        </TouchableOpacity>
+        {/* Action Buttons */}
+        <View style={styles.buttonContainer}>
+          {/* Setup later */}
+          <TouchableOpacity style={styles.laterButton} onPress={handleSetupLater} disabled={processing}>
+            <Text style={styles.laterButtonText}>Set up later</Text>
+          </TouchableOpacity>
 
-        {/* Enable motivation */}
-        <TouchableOpacity
-          style={[styles.enableButton, processing && { backgroundColor: BORDER_COLOR }]}
-          onPress={handleEnableMotivation}
-          disabled={processing}
-        >
-          {processing ? (
-            <ActivityIndicator color="#121820" />
-          ) : (
-            <Text style={styles.enableButtonText}>turn on motivation</Text>
-          )}
-        </TouchableOpacity>
+          {/* Enable motivation */}
+          <TouchableOpacity
+            style={[styles.enableButton, processing && { backgroundColor: BORDER_COLOR }]}
+            onPress={handleEnableMotivation}
+            disabled={processing}
+          >
+            {processing ? (
+              <ActivityIndicator color="#121820" />
+            ) : (
+              <Text style={styles.enableButtonText}>Turn on motivation</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -137,7 +139,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#121820',
-    padding: 24,
+  },
+  innerContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
   },
   headerContainer: {
     marginTop: 16,
@@ -168,10 +173,10 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
     color: ACCENT_PRIMARY,
-    textTransform: 'lowercase',
   },
   timeBubble: {
     marginTop: 20,
+    marginBottom: 10,
     paddingVertical: 10,
     paddingHorizontal: 16,
     backgroundColor: COMPONENT_BG,
@@ -191,20 +196,19 @@ const styles = StyleSheet.create({
   laterButton: {
     borderWidth: 1,
     borderColor: TEXT_PRIMARY,
-    borderRadius: 50,
+    borderRadius: 16,
     paddingVertical: 16,
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 10,
   },
   laterButtonText: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
     color: TEXT_PRIMARY,
-    textTransform: 'lowercase',
   },
   enableButton: {
-    backgroundColor: TEXT_SECONDARY,
-    borderRadius: 50,
+    backgroundColor: '#F5F5F0',
+    borderRadius: 16,
     paddingVertical: 16,
     alignItems: 'center',
   },
@@ -212,6 +216,5 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
     color: '#121820',
-    textTransform: 'lowercase',
   },
 }); 

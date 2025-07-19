@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 // @ts-ignore - type declarations may not be present in bare version; Expo managed app will have types at runtime.
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
+// Platform import removed – we no longer branch on platform in this module.
 import { createContextLogger } from '@/lib/logger';
 import { supabase } from '@/lib/supabase';
 
@@ -74,7 +74,6 @@ export class NotificationService {
       content: {
         title: 'Time for your me-time ✨',
         body: 'Open The Architect to transform your language and reality.',
-        sound: undefined, // silent by default; modify if needed
       },
       trigger: {
         hour,

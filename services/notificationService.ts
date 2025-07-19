@@ -12,7 +12,7 @@ import { supabase } from '@/lib/supabase';
  * If/when a Supabase table for notification preferences is added, this class can be easily extended.
  */
 // Storage key to persist the scheduled notification identifier & slot
-const REMINDER_STORAGE_KEY = 'archie_daily_reminder';
+const REMINDER_STORAGE_KEY_PREFIX = 'archie_daily_reminder_';
 
 // Create a scoped logger for this service
 const notificationLogger = createContextLogger('NotificationService');
@@ -48,15 +48,17 @@ export class NotificationService {
    * Cancels any previously-scheduled daily reminder and schedules a new one for the
    * provided time slot.
    */
-  static async scheduleDailyReminder(hour: number, minute: number): Promise<void> {
+  static async scheduleDailyReminder(hour: number, minute: number, slot: string): Promise<void> {
     // Ensure we have permission first
     const hasPermission = await this.requestPermission();
     if (!hasPermission) {
       throw new Error('Notifications permission not granted');
     }
 
-    // Cancel an existing reminder if one was stored
-    await this.cancelExistingReminder();
+    const storageKey = `${REMINDER_STORAGE_KEY_PREFIX}${slot}`;
+
+    // Cancel an existing reminder for this specific slot
+    await this.cancelReminderForSlot(slot);
 
     // Schedule the local notification to repeat daily at the desired time
     const identifier = await Notifications.scheduleNotificationAsync({
@@ -73,8 +75,8 @@ export class NotificationService {
 
     // Persist locally for cancellation
     await AsyncStorage.setItem(
-      REMINDER_STORAGE_KEY,
-      JSON.stringify({ identifier, hour, minute })
+      storageKey,
+      JSON.stringify({ identifier, hour, minute, slot })
     );
 
     // Persist to Supabase for cross-device sync
@@ -94,18 +96,18 @@ export class NotificationService {
 
       const userId = session.user.id;
 
-      // Upsert preference (unique per user)
+      // Upsert preference (unique per user and slot)
       const { error } = await supabase
         .from('user_notification_preferences')
         .upsert(
           {
             user_id: userId,
-            reminder_slot: 'custom',
+            reminder_slot: slot,
             hour,
             minute,
             updated_at: new Date().toISOString(),
           },
-          { onConflict: 'user_id' }
+          { onConflict: 'user_id, reminder_slot' }
         );
 
       if (error) {
@@ -122,7 +124,7 @@ export class NotificationService {
       });
     }
 
-    notificationLogger.info('Daily reminder scheduled', { identifier, hour, minute });
+    notificationLogger.info('Daily reminder scheduled', { identifier, hour, minute, slot });
   }
 
   /**
@@ -130,21 +132,46 @@ export class NotificationService {
    * This is idempotent – it is safe to call even if nothing is scheduled.
    */
   static async cancelExistingReminder(): Promise<void> {
-    const stored = await AsyncStorage.getItem(REMINDER_STORAGE_KEY);
+    const keys = await AsyncStorage.getAllKeys();
+    const reminderKeys = keys.filter(key => key.startsWith(REMINDER_STORAGE_KEY_PREFIX));
+
+    for (const key of reminderKeys) {
+        const stored = await AsyncStorage.getItem(key);
+        if (!stored) continue;
+
+        try {
+          const { identifier } = JSON.parse(stored);
+          if (identifier) {
+            await Notifications.cancelScheduledNotificationAsync(identifier);
+            notificationLogger.debug('Cancelled existing scheduled reminder', { identifier });
+          }
+        } catch (err) {
+          notificationLogger.warn('Failed to cancel existing reminder (parse error)', {
+            error: (err as Error).message,
+          });
+        } finally {
+          await AsyncStorage.removeItem(key);
+        }
+    }
+  }
+
+  static async cancelReminderForSlot(slot: string): Promise<void> {
+    const storageKey = `${REMINDER_STORAGE_KEY_PREFIX}${slot}`;
+    const stored = await AsyncStorage.getItem(storageKey);
     if (!stored) return;
 
     try {
       const { identifier } = JSON.parse(stored);
       if (identifier) {
         await Notifications.cancelScheduledNotificationAsync(identifier);
-        notificationLogger.debug('Cancelled existing scheduled reminder', { identifier });
+        notificationLogger.debug(`Cancelled reminder for slot: ${slot}`, { identifier });
       }
     } catch (err) {
-      notificationLogger.warn('Failed to cancel existing reminder (parse error)', {
+      notificationLogger.warn(`Failed to cancel reminder for slot: ${slot}`, {
         error: (err as Error).message,
       });
     } finally {
-      await AsyncStorage.removeItem(REMINDER_STORAGE_KEY);
+      await AsyncStorage.removeItem(storageKey);
     }
   }
 

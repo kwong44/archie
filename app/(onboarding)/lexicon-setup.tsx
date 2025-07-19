@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ArrowRight, Heart, X } from 'lucide-react-native';
+import { ArrowRight, Heart, X, ArrowLeft } from 'lucide-react-native';
 import { useAuth } from '@/context/AuthContext';
 import { OnboardingService } from '@/services/onboardingService';
 import { supabase } from '@/lib/supabase';
@@ -205,6 +205,14 @@ export default function LexiconSetupScreen() {
     );
   };
 
+  /**
+   * Handles the back navigation – mirrors behaviour from the Principles screen header.
+   */
+  const handleGoBack = () => {
+    console.log('🔙 User navigating back from lexicon setup screen');
+    router.back();
+  };
+
   if (isComplete) {
     return (
       <SafeAreaView style={styles.container}>
@@ -261,27 +269,40 @@ export default function LexiconSetupScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity style={styles.skipAllButton} onPress={handleSkipAll}>
-            <Text style={styles.skipAllButtonText}>Skip All</Text>
-          </TouchableOpacity>
-        </View>
-        
-        <Text style={styles.title}>Build Your Lexicon</Text>
-        <Text style={styles.subtitle}>
-          Choose word transformations that resonate with you
-        </Text>
-        
-        {/* Progress Bar */}
+      {/* ------------------------------------------------------------------- */}
+      {/* Navigation Header (Back | Step Progress Bar | Skip)                 */}
+      {/* ------------------------------------------------------------------- */}
+      <View style={styles.headerNavigation}>
+        {/* Back Button */}
+        <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
+          <ArrowLeft color="#F5F5F0" size={24} />
+        </TouchableOpacity>
+
+        {/* Centered Progress Bar for Onboarding Steps */}
         <View style={styles.progressContainer}>
           <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${progress}%` }]} />
+            <View style={styles.progressFill} />
           </View>
-          <Text style={styles.progressText}>
-            {currentIndex + 1} of {SAMPLE_WORD_PAIRS.length} • {acceptedPairs.length} selected
-          </Text>
+          <Text style={styles.progressText}>5/5</Text>
+          <TouchableOpacity onPress={handleSkipAll} disabled={isSaving}>
+            <Text style={styles.skipText}>skip</Text>
+        </TouchableOpacity>
         </View>
+
+       
+       
+      </View>
+      {/* Content Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Build Your Lexicon</Text>
+        <Text style={styles.subtitle}>Choose word transformations that resonate with you. You can always add more later.</Text>
+      </View>
+
+      {/* Word-level progress text placed above the card */}
+      <View style={styles.wordProgressContainer}>
+        <Text style={styles.wordProgressText}>
+          {currentIndex + 1} of {SAMPLE_WORD_PAIRS.length} • {acceptedPairs.length} selected
+        </Text>
       </View>
 
       {/* Current Card */}
@@ -333,6 +354,30 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#121820', // Primary background color
+    paddingHorizontal: 10,
+  },
+  headerNavigation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 10,
+    paddingBottom: 20,
+  },
+  backButton: {
+    padding: 8,
+  },
+  skipText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 16,
+    color: '#9CA3AF',
+  },
+  wordProgressContainer: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  wordProgressText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#9CA3AF',
   },
   header: {
     padding: 20,
@@ -343,19 +388,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     marginBottom: 16,
-  },
-  skipAllButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(156, 163, 175, 0.1)',
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-  skipAllButtonText: {
-    color: '#9CA3AF', // Secondary text color
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
   },
   title: {
     fontSize: 32,
@@ -371,31 +403,35 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   progressContainer: {
-    width: '100%',
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
+    marginLeft: 8,
   },
   progressTrack: {
-    width: '100%',
+    flex: 1,
     height: 4,
-    backgroundColor: '#374151', // Border color
+    backgroundColor: '#374151',
     borderRadius: 2,
-    marginBottom: 8,
+    overflow: 'hidden',
+    marginRight: 8,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#FFC300', // Primary accent color
-    borderRadius: 2,
+    width: '100%', // 5/5 => full fill
+    backgroundColor: '#A7F3D0',
   },
   progressText: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     color: '#9CA3AF', // Secondary text color
+    marginRight: 16,
   },
   cardContainer: {
-    flex: 1,
-    justifyContent: 'center',
+    flexGrow: 0,
     alignItems: 'center',
     paddingHorizontal: 20,
+    marginTop: 4,
   },
   card: {
     width: width * 0.85,
@@ -462,6 +498,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     paddingHorizontal: 40,
     paddingBottom: 40,
+    marginTop: 'auto',
   },
   actionButton: {
     flex: 1,
@@ -569,4 +606,5 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     fontSize: 14,
   },
+ 
 }); 

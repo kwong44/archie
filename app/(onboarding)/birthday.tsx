@@ -19,7 +19,7 @@ import { SkiaArt } from '../../components/SkiaArt';
 /**
  * BirthdayScreen Component
  * This screen prompts the user to enter their birthday as part of the onboarding process.
- * It features a personalized greeting, cake illustration, and date picker interface.
+ * It features a personalized greeting, SkiaArt component, and date picker interface.
  * The birthday is saved to the user_profiles table in the database.
  */
 export default function BirthdayScreen() {

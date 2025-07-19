@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Switch, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { createContextLogger } from '@/lib/logger';
-import { NotificationService, ReminderTimeSlot } from '@/services/notificationService';
-import { Sun, Flower, Moon } from 'lucide-react-native';
+import { NotificationService } from '@/services/notificationService';
 import { useAuth } from '@/context/AuthContext';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 // Create scoped logger for this screen
 const screenLogger = createContextLogger('ReminderSetupScreen');
@@ -16,19 +16,6 @@ const TEXT_PRIMARY = '#F5F5F0';
 const TEXT_SECONDARY = '#9CA3AF';
 const TEXT_TERTIARY = '#6B7280';
 
-interface TimeOption {
-  slot: ReminderTimeSlot;
-  label: string;
-  icon: React.FC<{ color: string; size: number }>;
-  displayTime: string;
-}
-
-const TIME_OPTIONS: TimeOption[] = [
-  { slot: 'morning', label: 'morning', icon: Sun, displayTime: '8:00 AM' },
-  { slot: 'day', label: 'day', icon: Flower, displayTime: '3:00 PM' },
-  { slot: 'evening', label: 'evening', icon: Moon, displayTime: '7:00 PM' },
-];
-
 /**
  * ReminderSetupScreen
  * Allows the user to pick a preferred reminder time slot and enables local push notifications.
@@ -37,25 +24,25 @@ const TIME_OPTIONS: TimeOption[] = [
 export default function ReminderSetupScreen() {
   const router = useRouter();
   const { session } = useAuth();
-  const [selectedSlot, setSelectedSlot] = useState<ReminderTimeSlot>('day');
   const [processing, setProcessing] = useState(false);
 
-  /**
-   * Handles toggle interaction – ensures only one switch is active at a time.
-   */
-  const handleToggle = (slot: ReminderTimeSlot) => {
-    setSelectedSlot(slot);
-  };
+  // State for custom time picker
+  const [time, setTime] = useState<Date>(() => {
+    const d = new Date();
+    d.setHours(8, 0, 0, 0); // default 8:00 AM
+    return d;
+  });
+  const [showPicker, setShowPicker] = useState(false);
 
   /**
    * Requests permission and schedules the daily reminder.
    */
   const handleEnableMotivation = async () => {
-    screenLogger.trackUserAction('enable_motivation_pressed', 'notifications', { slot: selectedSlot }, session?.user?.id);
+    screenLogger.trackUserAction('enable_motivation_pressed', 'notifications', { hour: time.getHours(), minute: time.getMinutes() }, session?.user?.id);
 
     setProcessing(true);
     try {
-      await NotificationService.scheduleDailyReminder(selectedSlot);
+      await NotificationService.scheduleDailyReminder(time.getHours(), time.getMinutes());
       Alert.alert('All set!', 'We\'ll remind you daily.');
       router.replace('/personalizing' as any);
     } catch (err) {
@@ -83,32 +70,27 @@ export default function ReminderSetupScreen() {
           <Text style={styles.headerSubtitle}>When would you like to receive your gentle reminder?</Text>
         </View>
 
-        {/* Time Options */}
-        <View style={styles.optionsContainer}>
-          {TIME_OPTIONS.map((opt) => {
-            const IconComp = opt.icon;
-            const isSelected = selectedSlot === opt.slot;
-            return (
-              <View key={opt.slot} style={styles.optionColumn}>
-                {/* Icon */}
-                <IconComp color={ACCENT_PRIMARY} size={28} />
-                {/* Label */}
-                <Text style={styles.optionLabel}>{opt.label}</Text>
-                {/* Time display */}
-                <View style={styles.timeBubble}>
-                  <Text style={styles.timeText}>{opt.displayTime}</Text>
-                </View>
-                {/* Switch */}
-                <Switch
-                  value={isSelected}
-                  onValueChange={() => handleToggle(opt.slot)}
-                  thumbColor={isSelected ? '#121820' : '#FFFFFF'}
-                  trackColor={{ true: ACCENT_PRIMARY, false: BORDER_COLOR }}
-                />
-              </View>
-            );
-          })}
-        </View>
+        {/* Time Picker Bubble */}
+        <TouchableOpacity style={styles.timeBubble} onPress={() => setShowPicker(true)}>
+          <Text style={styles.timeText}>
+            {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </Text>
+        </TouchableOpacity>
+
+        {showPicker && (
+          <DateTimePicker
+            value={time}
+            mode="time"
+            is24Hour={false}
+            display="spinner"
+            onChange={(event: any, selectedDate?: Date) => {
+              if (event.type === 'set' && selectedDate) {
+                setTime(selectedDate);
+              }
+              setShowPicker(false);
+            }}
+          />
+        )}
 
         {/* Action Buttons */}
         <View style={styles.buttonContainer}>
@@ -159,26 +141,12 @@ const styles = StyleSheet.create({
     color: TEXT_SECONDARY,
     marginTop: 12,
   },
-  optionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 60,
-  },
-  optionColumn: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  optionLabel: {
-    marginTop: 12,
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 16,
-    color: ACCENT_PRIMARY,
-  },
   timeBubble: {
-    marginTop: 20,
-    marginBottom: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    alignSelf: 'center',
+    marginTop: 60,
+    marginBottom: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
     backgroundColor: COMPONENT_BG,
     borderRadius: 24,
     borderWidth: 1,
@@ -217,4 +185,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#121820',
   },
+  optionColumn: { display: 'none' },
+  optionLabel: { display: 'none' },
+  optionsContainer: { display: 'none' },
 }); 

@@ -11,17 +11,8 @@ import { supabase } from '@/lib/supabase';
  * Follows BaaS First principle by persisting minimal preference data locally.
  * If/when a Supabase table for notification preferences is added, this class can be easily extended.
  */
-export type ReminderTimeSlot = 'morning' | 'day' | 'evening';
-
 // Storage key to persist the scheduled notification identifier & slot
 const REMINDER_STORAGE_KEY = 'archie_daily_reminder';
-
-// Convenience mapping from time slot -> hour/minute
-const TIME_SLOT_MAP: Record<ReminderTimeSlot, { hour: number; minute: number }> = {
-  morning: { hour: 8, minute: 3 },   // 8:03 AM
-  day: { hour: 15, minute: 41 },     // 3:41 PM
-  evening: { hour: 20, minute: 22 }, // 8:22 PM
-};
 
 // Create a scoped logger for this service
 const notificationLogger = createContextLogger('NotificationService');
@@ -57,7 +48,7 @@ export class NotificationService {
    * Cancels any previously-scheduled daily reminder and schedules a new one for the
    * provided time slot.
    */
-  static async scheduleDailyReminder(slot: ReminderTimeSlot): Promise<void> {
+  static async scheduleDailyReminder(hour: number, minute: number): Promise<void> {
     // Ensure we have permission first
     const hasPermission = await this.requestPermission();
     if (!hasPermission) {
@@ -66,8 +57,6 @@ export class NotificationService {
 
     // Cancel an existing reminder if one was stored
     await this.cancelExistingReminder();
-
-    const { hour, minute } = TIME_SLOT_MAP[slot];
 
     // Schedule the local notification to repeat daily at the desired time
     const identifier = await Notifications.scheduleNotificationAsync({
@@ -85,7 +74,7 @@ export class NotificationService {
     // Persist locally for cancellation
     await AsyncStorage.setItem(
       REMINDER_STORAGE_KEY,
-      JSON.stringify({ identifier, slot, hour, minute })
+      JSON.stringify({ identifier, hour, minute })
     );
 
     // Persist to Supabase for cross-device sync
@@ -111,7 +100,7 @@ export class NotificationService {
         .upsert(
           {
             user_id: userId,
-            reminder_slot: slot,
+            reminder_slot: 'custom',
             hour,
             minute,
             updated_at: new Date().toISOString(),
@@ -125,7 +114,7 @@ export class NotificationService {
           error: error.message,
         });
       } else {
-        notificationLogger.info('Notification preference saved to Supabase', { userId, slot });
+        notificationLogger.info('Notification preference saved to Supabase', { userId });
       }
     } catch (err) {
       notificationLogger.warn('Error persisting preference to Supabase', {
@@ -133,7 +122,7 @@ export class NotificationService {
       });
     }
 
-    notificationLogger.info('Daily reminder scheduled', { identifier, slot, hour, minute });
+    notificationLogger.info('Daily reminder scheduled', { identifier, hour, minute });
   }
 
   /**
@@ -162,7 +151,7 @@ export class NotificationService {
   /**
    * Retrieves the user\'s stored preference from Supabase (if any).
    */
-  static async getUserPreference(): Promise<{ slot: ReminderTimeSlot; hour: number; minute: number } | null> {
+  static async getUserPreference(): Promise<{ hour: number; minute: number } | null> {
     const {
       data: { session },
       error: sessionError,
@@ -181,6 +170,6 @@ export class NotificationService {
       return null;
     }
 
-    return { slot: data.reminder_slot as ReminderTimeSlot, hour: data.hour, minute: data.minute };
+    return { hour: data.hour, minute: data.minute };
   }
 } 

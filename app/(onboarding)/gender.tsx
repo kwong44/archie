@@ -138,10 +138,10 @@ export default function GenderScreen() {
       {/* Main Content */}
       <View style={styles.mainContent}>
         <Text style={styles.title}>
-          what's your gender?
+          What's your gender?
         </Text>
         <Text style={styles.subtitle}>
-          this helps us personalize your experience and provide more relevant insights.
+          This helps us personalize your experience and provide more relevant insights.
         </Text>
 
         {/* Gender Options */}
@@ -182,7 +182,7 @@ export default function GenderScreen() {
           {isLoading ? (
             <ActivityIndicator color="#121820" />
           ) : (
-            <Text style={styles.nextButtonText}>next</Text>
+            <Text style={styles.nextButtonText}>Next</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -246,7 +246,6 @@ const styles = StyleSheet.create({
     color: '#F5F5F0',
     textAlign: 'center',
     marginBottom: 16,
-    textTransform: 'lowercase',
     lineHeight: 34,
   },
   subtitle: {
@@ -291,10 +290,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F0',
     paddingVertical: 16,
     paddingHorizontal: 40,
-    borderRadius: 30,
+    borderRadius: 16,
     minWidth: 120,
     alignItems: 'center',
     justifyContent: 'center',
+    width: '100%',
   },
   disabledButton: {
     backgroundColor: '#374151',
@@ -303,6 +303,5 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
     color: '#121820',
-    textTransform: 'lowercase',
   },
 }); 

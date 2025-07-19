@@ -1,4 +1,5 @@
-import Purchases, { PurchasesPackage, CustomerInfo, PurchasesOffering } from 'react-native-purchases';
+import Purchases, { PurchasesPackage, CustomerInfo, PurchasesOffering, LOG_LEVEL } from 'react-native-purchases';
+import { Platform } from 'react-native';
 import { logger } from '@/lib/logger';
 
 /**
@@ -52,25 +53,52 @@ export class SubscriptionService {
   private static initialized = false;
 
   /**
-   * Initializes RevenueCat with the public API key
+   * Initializes RevenueCat with platform-specific API keys
+   * Following RevenueCat React Native documentation requirements
    * This should be called once when the app starts
    */
-  static async initialize(apiKey: string): Promise<void> {
+  static async initialize(iosApiKey: string, androidApiKey: string): Promise<void> {
     if (this.initialized) {
       logger.warn('RevenueCat already initialized');
       return;
     }
 
     try {
-      logger.info('Initializing RevenueCat SDK');
+      logger.info('Initializing RevenueCat SDK', { 
+        platform: Platform.OS,
+        hasIosKey: !!iosApiKey,
+        hasAndroidKey: !!androidApiKey 
+      });
       
-      await Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG); // Use INFO in production
-      await Purchases.configure({ apiKey });
+      // Set log level to DEBUG for development, INFO for production
+      await Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.DEBUG : LOG_LEVEL.INFO);
+      
+      // Configure with platform-specific API key as per RevenueCat docs
+      if (Platform.OS === 'ios') {
+        if (!iosApiKey) {
+          throw new Error('iOS API key is required for iOS platform');
+        }
+        await Purchases.configure({ apiKey: iosApiKey });
+        logger.info('RevenueCat configured for iOS', { 
+          keyPrefix: iosApiKey.slice(0, 10) + '...' 
+        });
+      } else if (Platform.OS === 'android') {
+        if (!androidApiKey) {
+          throw new Error('Android API key is required for Android platform');
+        }
+        await Purchases.configure({ apiKey: androidApiKey });
+        logger.info('RevenueCat configured for Android', { 
+          keyPrefix: androidApiKey.slice(0, 10) + '...' 
+        });
+      } else {
+        throw new Error(`Unsupported platform: ${Platform.OS}`);
+      }
       
       this.initialized = true;
-      logger.info('RevenueCat SDK initialized successfully');
+      logger.info('RevenueCat SDK initialized successfully', { platform: Platform.OS });
     } catch (error) {
       logger.error('Failed to initialize RevenueCat', { 
+        platform: Platform.OS,
         error: error instanceof Error ? error.message : 'Unknown error' 
       });
       throw error;
@@ -314,6 +342,14 @@ export class SubscriptionService {
    */
   static async signOut(): Promise<void> {
     try {
+      // Safety check: Only log out if the user is not anonymous.
+      // Calling logOut for an anonymous user is unnecessary and causes an error.
+      const isAnonymous = await Purchases.isAnonymous();
+      if (isAnonymous) {
+        logger.info('User is anonymous, skipping RevenueCat sign out.');
+        return;
+      }
+
       logger.info('Signing out from RevenueCat');
       await Purchases.logOut();
       logger.info('RevenueCat sign out successful');

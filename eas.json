@@ -12,7 +12,8 @@
         "EXPO_PUBLIC_AI_BACKEND_URL": "http://192.168.1.104:8000",
         "EXPO_PUBLIC_POSTHOG_API_KEY": "phc_vDoXW063AwzLdg4SEPaiSc37EkV10VS9R4dTPbNjkx0",
         "EXPO_PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com",
-        "EXPO_PUBLIC_REVENUE_CAT_API_KEY": "appl_xMCnvnfjISfQSJNlCEMyzKSNpdK"
+        "EXPO_PUBLIC_REVENUE_CAT_IOS_API_KEY": "appl_xMCnvnfjISfQSJNlCEMyzKSNpdK",
+        "EXPO_PUBLIC_REVENUE_CAT_ANDROID_API_KEY": "your_actual_android_key_here"
       }
     },
     "preview": {
@@ -22,7 +23,8 @@
         "EXPO_PUBLIC_AI_BACKEND_URL": "https://archie-ai-backend-325560983355.us-central1.run.app",
         "EXPO_PUBLIC_POSTHOG_API_KEY": "phc_vDoXW063AwzLdg4SEPaiSc37EkV10VS9R4dTPbNjkx0",
         "EXPO_PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com",
-        "EXPO_PUBLIC_REVENUE_CAT_API_KEY": "appl_xMCnvnfjISfQSJNlCEMyzKSNpdK"
+        "EXPO_PUBLIC_REVENUE_CAT_IOS_API_KEY": "appl_xMCnvnfjISfQSJNlCEMyzKSNpdK",
+        "EXPO_PUBLIC_REVENUE_CAT_ANDROID_API_KEY": "your_actual_android_key_here"
       }
     },
     "production": {
@@ -32,7 +34,8 @@
         "EXPO_PUBLIC_AI_BACKEND_URL": "https://archie-ai-backend-325560983355.us-central1.run.app",
         "EXPO_PUBLIC_POSTHOG_API_KEY": "phc_vDoXW063AwzLdg4SEPaiSc37EkV10VS9R4dTPbNjkx0",
         "EXPO_PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com",
-        "EXPO_PUBLIC_REVENUE_CAT_API_KEY": "appl_xMCnvnfjISfQSJNlCEMyzKSNpdK"
+        "EXPO_PUBLIC_REVENUE_CAT_IOS_API_KEY": "appl_xMCnvnfjISfQSJNlCEMyzKSNpdK",
+        "EXPO_PUBLIC_REVENUE_CAT_ANDROID_API_KEY": "your_actual_android_key_here"
       }
     }
   },

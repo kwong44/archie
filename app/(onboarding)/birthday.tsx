@@ -181,8 +181,8 @@ export default function BirthdayScreen() {
 
       <View style={styles.mainContent}>
         <Text style={styles.title}>
-          hey {userDisplayName}, welcome in.{'\n'}
-          when do we get to{'\n'}
+          Hey {userDisplayName}, welcome.{'\n'}
+          When do we get to{'\n'}
           celebrate you?
         </Text>
         
@@ -288,7 +288,7 @@ export default function BirthdayScreen() {
           {loading ? (
             <ActivityIndicator color="#121820" />
           ) : (
-            <Text style={styles.nextButtonText}>next</Text>
+            <Text style={styles.nextButtonText}>Next</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -352,7 +352,6 @@ const styles = StyleSheet.create({
     color: '#F5F5F0',
     textAlign: 'center',
     marginBottom: 40,
-    textTransform: 'lowercase',
     lineHeight: 34,
   },
   datePickerContainer: {
@@ -399,10 +398,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F0',
     paddingVertical: 16,
     paddingHorizontal: 40,
-    borderRadius: 30,
+    borderRadius: 16,
     minWidth: 120,
     alignItems: 'center',
     justifyContent: 'center',
+    width: '100%',
   },
   disabledButton: {
     backgroundColor: '#374151',
@@ -411,7 +411,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
     color: '#121820',
-    textTransform: 'lowercase',
   },
   // Replaces cake illustration with a circular generative art canvas
   skiaArtCircle: {

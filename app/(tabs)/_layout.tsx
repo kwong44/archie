@@ -75,9 +75,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="reminder-setup"
         options={{
-          href: null, // Exclude from deep linking & tab list
+          href: null, // Exclude from deep linking & tab bar
           headerShown: false,
-          tabBarButton: () => null,
         }}
       />
       {/* Guide tab removed from Tab Navigator to free space */}

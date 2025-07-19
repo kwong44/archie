@@ -16,48 +16,26 @@ const DUMMY_PRINCIPLES = [
   "I create my reality with my words.",
   "Every challenge is an opportunity for growth.",
   "I am the author of my own story.",
+
+  // Courage & Bold Action
   "I choose courage over comfort.",
-  "My focus determines my reality.",
-  "I speak with intention and purpose.",
-  "I am resilient and can overcome any setback.",
-  "I attract abundance by being grateful.",
-  "I transform limitations into possibilities.",
-  "My words shape my experience of life.",
-  
-  // Courage & Bold Action (Universe rewards courage)
   "I venture boldly into the unknown with confidence.",
-  "Each fear I face expands my courage capacity.",
-  "I embrace uncertainty as my pathway to growth.",
-  "Bold action flows naturally from my authentic self.",
-  "I pioneer new possibilities through brave choices.",
-  
-  // Curiosity & Experimentation (Universe loves curiosity)
+
+  // Curiosity & Experimentation
   "I experiment with life rather than just 'doing' tasks.",
   "Curiosity is my compass for meaningful discovery.",
-  "I explore with wonder instead of approaching with worry.",
-  "Every moment offers fascinating insights to uncover.",
-  "I follow my passion as my truest guide.",
-  
-  // Love as Fundamental Force
+
+  // Love & Connection
   "I operate from love, knowing it's the universe's foundation.",
   "Connection and compassion guide all my interactions.",
-  "I see challenges as invitations to express deeper love.",
-  "Unity underlies all apparent separation and conflict.",
-  "I nurture what I wish to see flourish.",
-  
-  // Renewal & Healing (Pain as growth opportunity)
+
+  // Renewal & Healing
   "I renew rather than repair, strengthen rather than fix.",
   "Every setback signals an opportunity for profound renewal.",
-  "I heal by returning to my natural state of wholeness.",
-  "Pain reveals where love seeks fuller expression.",
-  "I transform wounds into wisdom through conscious reframing.",
-  
+
   // Neuroplasticity & Mental Rewiring
   "My brain rewires itself with each intentional word choice.",
-  "I consciously program new neural pathways through language.",
-  "Repetition of empowering words creates lasting change.",
-  "I replace limiting thought patterns with expansive ones.",
-  "My vocabulary is the code that programs my experience."
+  "I consciously program new neural pathways through language."
 ];
 
 /**
@@ -230,7 +208,7 @@ export default function PrinciplesScreen() {
             <ActivityIndicator color="#121820" size="small" />
           ) : (
             <Text style={[styles.buttonText, isButtonDisabled && styles.buttonTextDisabled]}>
-              Continue to Lexicon Setup
+              Next
             </Text>
           )}
         </TouchableOpacity>
@@ -249,7 +227,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#121820', // Primary background color
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
   },
   headerNavigation: {
     flexDirection: 'row',
@@ -352,14 +330,14 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
   },
   buttonContainer: {
-    padding: 20,
+    padding: 10,
     alignItems: 'center',
   },
   button: {
-    backgroundColor: '#FFC300', // Primary accent color
+    backgroundColor: '#F5F5F0', // Primary accent color
     paddingVertical: 16,
     paddingHorizontal: 24,
-    borderRadius: 12,
+    borderRadius: 16,
     width: '100%',
     alignItems: 'center',
     marginBottom: 8,

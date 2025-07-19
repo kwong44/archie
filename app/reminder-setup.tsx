@@ -136,8 +136,8 @@ export default function ReminderSetupScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
-    paddingHorizontal: 24,
+    backgroundColor: '#121820',
+    padding: 24,
   },
   headerContainer: {
     marginTop: 16,

@@ -1,5 +1,9 @@
 import { supabase } from '@/lib/supabase';
 import { z } from 'zod';
+import { createContextLogger } from '@/lib/logger';
+import { UserProfile } from './userService';
+
+const onbLogger = createContextLogger('OnboardingService');
 
 /**
  * Validation schemas for onboarding data
@@ -88,6 +92,7 @@ export class OnboardingService {
       }
 
       console.log('✅ Principles saved successfully:', data);
+      onbLogger.info('User principles saved successfully', { userId });
       return data;
 
     } catch (error) {
@@ -153,6 +158,7 @@ export class OnboardingService {
       }
 
       console.log('✅ Word pairs saved successfully:', data);
+      onbLogger.info('Word pairs saved successfully', { userId });
       return data;
 
     } catch (error) {
@@ -222,64 +228,30 @@ export class OnboardingService {
   }
 
   /**
-   * Completes the onboarding process by saving both principles and word pairs
-   * This is a convenience method for the final onboarding step
-   * 
-   * @param userId - The authenticated user's ID
-   * @param principles - Array of selected principle strings
-   * @param wordPairs - Array of selected word pair objects
-   * @returns Promise resolving to completion status
+   * Marks the user's onboarding process as complete.
+   * This is the final step in the onboarding flow.
+   * @param userId The ID of the user to update.
    */
-  static async completeOnboarding(
-    userId: string,
-    principles: string[],
-    wordPairs: Array<{
-      id: string;
-      oldWord: string;
-      newWord: string;
-      description?: string;
-    }>
-  ): Promise<{ success: boolean; principleCount: number; wordPairCount: number }> {
-    console.log('🎯 Completing onboarding process', { 
-      userId, 
-      principleCount: principles.length, 
-      wordPairCount: wordPairs.length 
-    });
+  static async completeOnboarding(userId: string): Promise<void> {
+    onbLogger.info('Marking onboarding as complete', { userId });
 
     try {
-      // Save principles and word pairs in parallel for better performance
-      const [savedPrinciples, savedWordPairs] = await Promise.all([
-        this.savePrinciples(userId, principles),
-        this.saveWordPairs(userId, wordPairs),
-      ]);
-
-      // Update user's onboarding status
-      const { error: updateError } = await supabase
+      const { error } = await supabase
         .from('user_profiles')
-        .update({ 
+        .update({
           onboarding_completed: true,
-          onboarding_completed_at: new Date().toISOString()
+          onboarding_completed_at: new Date().toISOString(),
         })
         .eq('user_id', userId);
 
-      if (updateError) {
-        console.error('❌ Failed to update onboarding status:', updateError);
-        // Don't throw here as the core data was saved successfully
+      if (error) {
+        throw error;
       }
 
-      console.log('🎉 Onboarding completed successfully', {
-        principleCount: savedPrinciples.length,
-        wordPairCount: savedWordPairs.length
-      });
-
-      return {
-        success: true,
-        principleCount: savedPrinciples.length,
-        wordPairCount: savedWordPairs.length,
-      };
-
+      onbLogger.info('Onboarding successfully marked as complete', { userId });
     } catch (error) {
-      console.error('❌ Error completing onboarding:', error);
+      onbLogger.error('Failed to mark onboarding complete', { userId, error });
+      // Re-throw the error to be handled by the caller
       throw error;
     }
   }

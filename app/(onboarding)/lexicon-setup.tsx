@@ -139,7 +139,7 @@ export default function LexiconSetupScreen() {
 
   /**
    * Handles completion of lexicon setup
-   * Saves accepted pairs to Supabase, marks onboarding as complete, and navigates to main app
+   * Saves accepted pairs to Supabase, marks onboarding as complete, and navigates to reminder-setup
    */
   const handleComplete = async () => {
     if (!session?.user) {
@@ -151,9 +151,9 @@ export default function LexiconSetupScreen() {
     setIsSaving(true);
     
     try {
-      console.log('🎉 Completing onboarding and saving lexicon to database');
+      console.log('🎉 Saving lexicon to database');
       
-      // Save word pairs and mark onboarding as complete
+      // Save word pairs
       await OnboardingService.saveWordPairs(
         session.user.id,
         acceptedPairs.map(pair => ({
@@ -164,35 +164,18 @@ export default function LexiconSetupScreen() {
         }))
       );
 
-      // Mark onboarding as completed in user profile
-      const { error: updateError } = await supabase
-        .from('user_profiles')
-        .update({ 
-          onboarding_completed: true,
-          onboarding_completed_at: new Date().toISOString()
-        })
-        .eq('user_id', session.user.id);
-
-      if (updateError) {
-        console.error('❌ Failed to update onboarding status:', updateError);
-        // Don't throw here as the core data was saved successfully
-      }
-
-      console.log('✅ Onboarding completed successfully');
+      console.log('✅ Lexicon saved successfully');
       
-      // Refresh auth context onboarding status
-      await checkOnboardingStatus();
-      
-      // Navigate user to reminder setup (daily motivation) before landing on main tabs
-      router.replace('/(tabs)/reminder-setup' as any);
+      // Navigate user to the reminder setup screen inside onboarding group
+      router.replace('/(onboarding)/reminder-setup' as any);
       
     } catch (error) {
-      console.error('❌ Failed to complete onboarding:', error);
+      console.error('❌ Failed to save lexicon:', error);
       Alert.alert(
         'Save Error',
         'Failed to save your lexicon. Please try again.',
         [
-          { text: 'Skip for now', onPress: () => router.replace('/(tabs)' as any) },
+          { text: 'Skip for now', onPress: () => router.replace('/(onboarding)/reminder-setup' as any) },
           { text: 'Retry', onPress: handleComplete },
         ]
       );
@@ -212,25 +195,10 @@ export default function LexiconSetupScreen() {
         { text: 'Continue Setup', style: 'cancel' },
         { 
           text: 'Skip', 
-          onPress: async () => {
+          onPress: () => {
             console.log('⏭️ User skipped lexicon setup');
-            
-            if (session?.user) {
-              try {
-                // Mark onboarding as completed even when skipping
-                await supabase
-                  .from('user_profiles')
-                  .update({ 
-                    onboarding_completed: true,
-                    onboarding_completed_at: new Date().toISOString()
-                  })
-                  .eq('user_id', session.user.id);
-                
-                await checkOnboardingStatus();
-              } catch (error) {
-                console.error('❌ Failed to update onboarding status when skipping:', error);
-              }
-            }
+            // Navigate the user to the reminder setup screen inside onboarding group
+            router.replace('/(onboarding)/reminder-setup' as any);
           }
         },
       ]
@@ -464,7 +432,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   oldWord: {
-    fontSize: 20,
+    fontSize: 17,
     fontFamily: 'Inter-Regular',
     color: '#4A90E2', // Secondary accent color
     textAlign: 'center',
@@ -484,7 +452,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   newWord: {
-    fontSize: 20,
+    fontSize: 17,
     fontFamily: 'Inter-SemiBold',
     color: '#FFC300', // Primary accent color
     textAlign: 'center',

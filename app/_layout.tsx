@@ -13,6 +13,7 @@ import Constants from 'expo-constants';
 import * as Linking from 'expo-linking';
 import { makeRedirectUri } from 'expo-auth-session';
 import { finishOAuth } from '@/lib/finishOAuth';
+import { Platform } from 'react-native';
 
 // Create a context-specific logger for navigation workflows
 const navLogger = createContextLogger('RootLayout');
@@ -136,6 +137,7 @@ function RootLayoutNav() {
       <Stack.Screen name="personalizing" options={{ headerShown: false }} />
       <Stack.Screen name="trial-intro" options={{ headerShown: false }} />
       <Stack.Screen name="all-plans" options={{ headerShown: false }} />
+      <Stack.Screen name="reminder-setup" options={{ headerShown: false }} />
       <Stack.Screen name="+not-found" />
     </Stack>
   );
@@ -164,39 +166,54 @@ export default function RootLayout() {
     postHogApiKey !== '$EXPO_PUBLIC_POSTHOG_API_KEY' && 
     postHogApiKey.startsWith('phc_');
 
-  /**
-   * Initialize RevenueCat when the app starts
-   * Uses the API key from environment variables
-   */
   useEffect(() => {
-    const initializeRevenueCat = async () => {
+    const initializeApp = async () => {
       try {
-        const revenueCatApiKey = Constants.expoConfig?.extra?.revenueCatApiKey;
+        navLogger.info('Initializing application dependencies...');
         
-        if (revenueCatApiKey) {
-          navLogger.debug('RevenueCat key snippet', { keyPrefix: revenueCatApiKey.slice(0, 10) });
-          navLogger.info('Initializing RevenueCat');
-          await SubscriptionService.initialize(revenueCatApiKey);
+        /**
+         * Initialize RevenueCat SDK
+         * Using hardcoded API keys as requested for direct testing.
+         * NOTE: For production, it is strongly recommended to switch back to 
+         * using environment variables to manage different keys for sandbox and live environments.
+         */
+        const iosApiKey = "appl_xMCnvnfjISfQSJNlCEMyzKSNpdK";
+        const androidApiKey = "your_revenuecat_android_api_key_here"; // Replace with your actual key
+
+        // Log the keys (partially) to confirm they are being loaded correctly
+        navLogger.info('RevenueCat environment check', {
+          platform: Platform.OS,
+          hasIosKey: !!iosApiKey,
+          hasAndroidKey: !!androidApiKey,
+          iosKeyPrefix: iosApiKey?.slice(0, 5) + '...',
+          androidKeyPrefix: androidApiKey?.slice(0, 5) + '...',
+        });
+
+        if ((Platform.OS === 'ios' && iosApiKey) || (Platform.OS === 'android' && androidApiKey)) {
+          navLogger.info('Initializing RevenueCat with available keys');
+          // Your service is designed to take both, which is great.
+          await SubscriptionService.initialize(iosApiKey || '', androidApiKey || '');
           navLogger.info('RevenueCat initialized successfully');
         } else {
-          navLogger.warn('RevenueCat API key not found in environment variables');
+          navLogger.error('Missing required RevenueCat API key for the current platform.', { platform: Platform.OS });
         }
+
       } catch (error) {
-        navLogger.error('Failed to initialize RevenueCat', { 
+        navLogger.error('Failed during app initialization', { 
           error: error instanceof Error ? error.message : 'Unknown error' 
         });
+      } finally {
+        // This now runs after all other initialization logic is complete
+        navLogger.debug('Initialization complete, hiding splash screen.');
+        SplashScreen.hideAsync();
       }
     };
 
-    initializeRevenueCat();
-  }, []);
-
-  useEffect(() => {
+    // Only run the initialization logic after fonts are ready
     if (fontsLoaded || fontError) {
-      navLogger.debug('Fonts loaded, hiding splash screen');
-      SplashScreen.hideAsync();
+      initializeApp();
     }
-  }, [fontsLoaded, fontError]);
+  }, [fontsLoaded, fontError]); // Re-run if font status changes
 
   // Log PostHog configuration status
   useEffect(() => {

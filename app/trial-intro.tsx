@@ -4,6 +4,8 @@ import { useRouter } from 'expo-router';
 import { SubscriptionService, SubscriptionPackage } from '@/services/subscriptionService';
 import { createContextLogger } from '@/lib/logger';
 import { CheckCircle, Bell, Star } from 'lucide-react-native';
+import { useAuth } from '@/context/AuthContext';
+import { OnboardingService } from '@/services/onboardingService';
 
 // Logger (rule: Logging)
 const screenLogger = createContextLogger('TrialIntroScreen');
@@ -45,6 +47,7 @@ const TIMELINE: TimelineItem[] = [
 
 export default function TrialIntroScreen() {
   const router = useRouter();
+  const { session, checkOnboardingStatus } = useAuth();
   const [loadingPrice, setLoadingPrice] = useState(true);
   const [yearlyPriceString, setYearlyPriceString] = useState<string>('');
   const [yearlyPackageId, setYearlyPackageId] = useState<string | null>(null);
@@ -64,12 +67,29 @@ export default function TrialIntroScreen() {
       .finally(() => setLoadingPrice(false));
   }, []);
 
+  /**
+   * Marks onboarding as complete and refreshes the auth state.
+   * This is the final step of the user onboarding flow.
+   */
+  const completeOnboarding = async () => {
+    if (!session?.user) return;
+    try {
+      screenLogger.info('Completing onboarding flow', { userId: session.user.id });
+      await OnboardingService.completeOnboarding(session.user.id);
+      await checkOnboardingStatus(); // Refresh auth context
+    } catch (error) {
+      screenLogger.error('Failed to mark onboarding as complete', { error: String(error) });
+      // Don't block the user, but log the error
+    }
+  };
+
   const handleContinue = async () => {
     if (!yearlyPackageId) return;
     screenLogger.trackUserAction('trial_intro_continue', 'subscription', { packageId: yearlyPackageId });
     setProcessing(true);
     try {
       const result = await SubscriptionService.purchasePackage(yearlyPackageId);
+      await completeOnboarding(); // Mark onboarding complete on success
       if (result.success) {
         Alert.alert('Welcome!', 'Your premium subscription is now active.');
         (router as any).replace('/(tabs)');
@@ -86,8 +106,9 @@ export default function TrialIntroScreen() {
 
   const handleViewAll = () => {
     screenLogger.trackUserAction('trial_intro_view_all', 'subscription');
-    // @ts-ignore – typed routes not yet generated for dynamic screen
-    (router as any).replace('/all-plans', undefined);
+    // Intentionally not marking onboarding as complete here,
+    // as the user might come back to this screen.
+    router.push('/all-plans' as any);
   };
 
   return (

@@ -44,14 +44,14 @@ export default function PersonalizingScreen() {
     // Simulate async work then navigate to next step (placeholder)
     setTimeout(() => {
       screenLogger.info('Personalization simulated complete – navigating onwards');
-      router.replace('/trial-intro' as any);
+      router.replace('/(onboarding)/trial-intro' as any);
     }, 2500);
   };
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Title */}
-      <Text style={styles.title}>{`welcome to pillowtalk, ${displayName}!`}</Text>
+      <Text style={styles.title}>{`Welcome to Archie, ${displayName}!`}</Text>
 
       {/* Placeholder visual – replace with Lottie or SVG later */}
       <View style={styles.visualPlaceholder}>
@@ -72,9 +72,9 @@ export default function PersonalizingScreen() {
         activeOpacity={0.8}
       >
         {isPersonalizing ? (
-          <Text style={styles.buttonText}>personalizing your experience...</Text>
+          <Text style={styles.buttonText}>Personalizing your experience...</Text>
         ) : (
-          <Text style={styles.buttonText}>get started</Text>
+          <Text style={styles.buttonText}>Get started</Text>
         )}
       </TouchableOpacity>
 
@@ -97,7 +97,6 @@ const styles = StyleSheet.create({
     color: TEXT_PRIMARY,
     marginTop: 20,
     lineHeight: 38,
-    textTransform: 'lowercase',
   },
   visualPlaceholder: {
     alignSelf: 'center',
@@ -138,7 +137,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
     color: BG_PRIMARY,
-    textTransform: 'lowercase',
   },
   progressBar: {
     height: 4,

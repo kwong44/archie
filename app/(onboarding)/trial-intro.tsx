@@ -174,7 +174,7 @@ export default function TrialIntroScreen() {
           ) : weeklyPackage ? (
             <Text style={styles.priceCopy}>
               <Text style={styles.priceHighlight}>
-                {weeklyPackage.product.introductoryPrice?.priceString || weeklyPackage.product.priceString} for the first week
+                $0.99 for the first week
               </Text>
               , then {weeklyPackage.product.priceString}/week. Cancel anytime.
             </Text>
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     fontSize: 32,
     color: TEXT_PRIMARY,
-    marginTop: 20,
+    marginTop: 40,
     lineHeight: 38,
   },
   timelineContainer: {
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   testimonialCard: {
-    backgroundColor: '#254417', // darker green for contrast
+    backgroundColor: '#1F2937', // darker green for contrast
     borderRadius: 16,
     padding: 20,
     marginTop: 12,

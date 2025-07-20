@@ -215,6 +215,16 @@ export default function LexiconScreen() {
             </TouchableOpacity>
           </View>
         </ScrollView>
+
+        {/* Ensure the modal is rendered even in empty state */}
+        {session?.user && (
+          <AddWordPairModal
+            visible={showAddModal}
+            onClose={() => setShowAddModal(false)}
+            onWordPairAdded={handleWordPairAdded}
+            userId={session.user.id}
+          />
+        )}
       </SafeAreaView>
     );
   }

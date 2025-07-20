@@ -8,13 +8,14 @@ import { Check } from 'lucide-react-native';
 // Logger
 const screenLogger = createContextLogger('AllPlansScreen');
 
-// Theme constants
-const BG_PRIMARY = '#121820';
-const CARD_BG = '#FFFFFF';
-const CARD_BG_SELECTED = '#D6FF8F'; // light lime similar to screenshot
-const TEXT_PRIMARY = '#000000';
-const TEXT_SECONDARY = '#6B7280';
-const ACCENT_PRIMARY = '#FFC300';
+// UI Guideline Colors
+const BG_PRIMARY = '#121820'; // Matching app's primary background
+const COMPONENT_BG = '#1F2937'; // Matching app's component background
+const BORDER_COLOR = '#374151'; // Matching app's border color
+const ACCENT_PRIMARY = '#FFC300'; // Matching app's primary accent
+const TEXT_PRIMARY = '#F5F5F0'; // Matching app's primary text
+const TEXT_SECONDARY = '#9CA3AF'; // Matching app's secondary text
+const TEXT_ON_ACCENT = '#121820'; // Text on accent backgrounds
 
 export default function AllPlansScreen() {
   const router = useRouter();
@@ -26,14 +27,19 @@ export default function AllPlansScreen() {
   useEffect(() => {
     SubscriptionService.getAvailablePackages()
       .then((pkgs) => {
-        // Sort to monthly first, then yearly etc.
+        // Sort packages by estimated weekly price to handle different periods
         const sorted = pkgs.sort((a, b) => {
-          // simple price sort isn't robust enough for different periods.
-          // this is a rough but better approximation.
-          const priceA = a.product.price / (a.packageType === 'MONTHLY' ? 1 : a.packageType === 'ANNUAL' ? 12 : 0.25);
-          const priceB = b.product.price / (b.packageType === 'MONTHLY' ? 1 : b.packageType === 'ANNUAL' ? 12 : 0.25);
-          return priceA - priceB;
+          const getNormalizedPrice = (p: SubscriptionPackage) => {
+            switch (p.packageType) {
+              case 'ANNUAL': return p.product.price / 52;
+              case 'MONTHLY': return p.product.price / 4;
+              case 'WEEKLY': return p.product.price;
+              default: return p.product.price;
+            }
+          };
+          return getNormalizedPrice(a) - getNormalizedPrice(b);
         });
+        
         setPackages(sorted);
         
         // Default selection to the plan with an intro offer, or the first one.
@@ -45,6 +51,7 @@ export default function AllPlansScreen() {
       .catch((err) => screenLogger.error('Failed to load packages', { error: String(err) }))
       .finally(() => setLoading(false));
   }, []);
+
 
   const handleSelect = (id: string) => {
     setSelectedPackageId(id);
@@ -72,7 +79,21 @@ export default function AllPlansScreen() {
 
   const handleRestore = () => {
     screenLogger.trackUserAction('all_plans_restore', 'subscription');
-    router.replace('/paywall' as any);
+    // Assuming you have a restore mechanism on the paywall or want one here
+    Alert.alert('Restore Purchases', 'Restoring your previous purchases...');
+    SubscriptionService.restorePurchases()
+      .then(result => {
+        if (result.success) {
+          Alert.alert('Success', 'Your purchases have been restored.');
+          (router as any).replace('/(tabs)');
+        } else {
+          Alert.alert('No Purchases Found', 'We couldn\'t find any previous purchases to restore.');
+        }
+      })
+      .catch(err => {
+        screenLogger.error('Restore error', { error: String(err) });
+        Alert.alert('Error', 'An unexpected error occurred during restore.');
+      });
   };
 
   return (
@@ -80,7 +101,7 @@ export default function AllPlansScreen() {
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* Decorative placeholder could go here */}
         <View style={styles.titleWrapper}>
-          <Text style={styles.title}>Choose other plan</Text>
+          <Text style={styles.title}>Choose Your Plan</Text>
         </View>
 
         {loading ? (
@@ -96,15 +117,15 @@ export default function AllPlansScreen() {
                 activeOpacity={0.8}
               >
                 <View style={styles.cardTextWrapper}>
-                  <Text style={[styles.cardTitle, isSelected && { color: TEXT_PRIMARY }]}>
+                  <Text style={[styles.cardTitle, isSelected && { color: TEXT_ON_ACCENT }]}>
                     {pkg.product.title}
                   </Text>
                   
                   {/* Informational text about the plan */}
-                  <Text style={[styles.cardSubtitle, isSelected && { color: TEXT_PRIMARY }]}>
+                  <Text style={[styles.cardSubtitle, isSelected && { color: TEXT_ON_ACCENT }]}>
                     {pkg.product.introductoryPrice ? (
                       <>
-                        <Text style={{ fontWeight: 'bold' }}>
+                        <Text style={{ fontFamily: 'Inter-Bold' }}>
                           {pkg.product.introductoryPrice.priceString} for the first {pkg.product.introductoryPrice.periodNumberOfUnits > 1 ? pkg.product.introductoryPrice.periodNumberOfUnits : ''} {pkg.product.introductoryPrice.periodUnit.toLowerCase()}
                         </Text>
                         , then {pkg.product.priceString} / {pkg.packageType === 'ANNUAL' ? 'year' : 'month'}
@@ -119,9 +140,6 @@ export default function AllPlansScreen() {
                     )}
                   </Text>
                 </View>
-                <View style={[styles.radio, isSelected && styles.radioSelected]}>
-                  {isSelected && <Check size={18} color={BG_PRIMARY} strokeWidth={3} />}
-                </View>
               </TouchableOpacity>
             );
           })
@@ -129,12 +147,12 @@ export default function AllPlansScreen() {
 
         {/* Continue button */}
         <TouchableOpacity
-          style={[styles.continueButton, processing && { opacity: 0.6 }]}
+          style={[styles.continueButton, (processing || !selectedPackageId) && { opacity: 0.6 }]}
           onPress={handleContinue}
           disabled={processing || !selectedPackageId}
         >
           {processing ? (
-            <ActivityIndicator color={BG_PRIMARY} />
+            <ActivityIndicator color={TEXT_ON_ACCENT} />
           ) : (
             <Text style={styles.continueText}>Continue</Text>
           )}
@@ -156,7 +174,7 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     paddingHorizontal: 24,
-    paddingTop: 20,
+    paddingTop: 40,
     paddingBottom: 40,
   },
   titleWrapper: {
@@ -165,12 +183,14 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: 'Inter-Bold',
     fontSize: 32,
-    color: '#FFFFFF',
+    color: TEXT_PRIMARY,
     textAlign: 'center',
   },
   card: {
-    backgroundColor: CARD_BG,
-    borderRadius: 28,
+    backgroundColor: COMPONENT_BG,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: BORDER_COLOR,
     padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
@@ -178,7 +198,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   cardSelected: {
-    backgroundColor: CARD_BG_SELECTED,
+    backgroundColor: ACCENT_PRIMARY,
+    borderColor: ACCENT_PRIMARY,
   },
   cardTextWrapper: {
     flex: 1,
@@ -187,6 +208,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     fontSize: 20,
     color: TEXT_PRIMARY,
+    marginBottom: 4,
   },
   cardSubtitle: {
     fontFamily: 'Inter-Regular',
@@ -195,24 +217,11 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   discountText: {
-    color: '#059669', // a nice green for the discount
+    color: '#10B981', // accent-success from guidelines
     fontFamily: 'Inter-SemiBold',
   },
-  radio: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: '#C4C4C4',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  radioSelected: {
-    backgroundColor: '#000000',
-    borderColor: '#000000',
-  },
   continueButton: {
-    backgroundColor: '#D1D1D1',
+    backgroundColor: ACCENT_PRIMARY,
     borderRadius: 18,
     paddingVertical: 16,
     alignItems: 'center',
@@ -221,7 +230,7 @@ const styles = StyleSheet.create({
   continueText: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
-    color: '#000000',
+    color: TEXT_ON_ACCENT,
   },
   restoreButton: {
     marginTop: 24,
@@ -231,5 +240,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     fontSize: 14,
     color: TEXT_SECONDARY,
+    textDecorationLine: 'underline',
   },
 }); 

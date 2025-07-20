@@ -138,7 +138,8 @@ function RootLayoutNav() {
       }
     } else if (session && onboardingCompleted === true) {
       // Subscription gating logic
-      const inPaywallFlow = segments[0] === 'trial-intro' || segments[0] === 'paywall' || segments[0] === 'all-plans';
+      const isTrialIntro = segments[0] === '(onboarding)' && segments[1] === 'trial-intro';
+      const inPaywallFlow = isTrialIntro || segments[0] === 'paywall' || segments[0] === 'all-plans';
 
       // Wait until premium status has been determined
       if (hasPremium === null) {
@@ -150,7 +151,7 @@ function RootLayoutNav() {
         // No premium – redirect user to trial intro (hard paywall)
         if (!inPaywallFlow) {
           navLogger.info('No active subscription detected – redirecting to paywall');
-          router.replace('/trial-intro' as any);
+          router.replace('/(onboarding)/trial-intro' as any);
         }
       } else {
         // Premium active – ensure user is within the main app
@@ -197,6 +198,9 @@ export default function RootLayout() {
     'Inter-SemiBold': Inter_600SemiBold,
     'Inter-Bold': Inter_700Bold,
   });
+
+  // State to prevent re-initialization
+  const [appInitialized, setAppInitialized] = useState(false);
 
   /**
    * PostHog analytics configuration - Following official documentation pattern
@@ -250,14 +254,16 @@ export default function RootLayout() {
         // This now runs after all other initialization logic is complete
         navLogger.debug('Initialization complete, hiding splash screen.');
         SplashScreen.hideAsync();
+        // Mark initialization as complete to prevent this useEffect from running again
+        setAppInitialized(true);
       }
     };
 
-    // Only run the initialization logic after fonts are ready
-    if (fontsLoaded || fontError) {
+    // Only run the initialization logic after fonts are ready and if not already initialized
+    if ((fontsLoaded || fontError) && !appInitialized) {
       initializeApp();
     }
-  }, [fontsLoaded, fontError]); // Re-run if font status changes
+  }, [fontsLoaded, fontError, appInitialized]); // Re-run if font status changes
 
   // Log PostHog configuration status
   useEffect(() => {

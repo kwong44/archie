@@ -124,9 +124,9 @@ const styles = StyleSheet.create({
       },
       modalContent: {
         backgroundColor: COMPONENT_BG,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
+        borderRadius: 20,
         padding: 20,
+        marginBottom: 10,
         height: '50%',
       },
       headerTitle: {
@@ -134,6 +134,7 @@ const styles = StyleSheet.create({
         fontSize: 24,
         color: TEXT_PRIMARY,
         textAlign: 'center',
+        marginTop: 20,
         marginBottom: 20,
       },
       timePickerContainer: {
@@ -162,6 +163,7 @@ const styles = StyleSheet.create({
       buttonContainer: {
         marginTop: 'auto',
         paddingBottom: 20,
+        marginHorizontal: 20,
       },
       laterButton: {
         borderWidth: 1,

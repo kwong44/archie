@@ -14,7 +14,6 @@ import {
   Shield,
   Heart,
   ChevronRight,
-  Moon,
   Sparkles,
   MessageCircle,
   LogOut,
@@ -169,7 +168,6 @@ const GuideScreen: React.FC = () => {
       items: [
         { icon: User, label: 'Profile', description: 'Manage your info' },
         { icon: Bell, label: 'Notifications', description: 'Customize reminders', onPress: () => router.push('/notification-settings' as any) },
-        { icon: Moon, label: 'Preferences', description: 'Theme & display' },
       ],
     },
     {

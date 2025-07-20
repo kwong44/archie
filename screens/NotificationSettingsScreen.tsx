@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Switch, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { NotificationService, ReminderTimeSlot } from '@/services/notificationService';
+import { NotificationService } from '@/services/notificationService';
 import { createContextLogger } from '@/lib/logger';
-import { Sun, Flower, Moon } from 'lucide-react-native';
+import { Sun, Cloud, Moon, X as XIcon } from 'lucide-react-native';
 import { useAuth } from '@/context/AuthContext';
+import { TimePickerModal } from '@/components/TimePickerModal';
 
 const log = createContextLogger('NotificationSettings');
 
@@ -14,40 +15,67 @@ const BORDER_COLOR = '#374151';
 const TEXT_PRIMARY = '#F5F5F0';
 const TEXT_SECONDARY = '#9CA3AF';
 const TEXT_TERTIARY = '#6B7280';
+const PRIMARY_BACKGROUND = '#121820';
+
+type ReminderSlot = 'morning' | 'day' | 'night';
 
 interface TimeOptionDef {
-  slot: ReminderTimeSlot;
+  slot: ReminderSlot;
   label: string;
   icon: React.FC<{ color: string; size: number }>;
   display: string;
+  hour: number;
+  minute: number;
 }
+
 const OPTIONS: TimeOptionDef[] = [
-  { slot: 'morning', label: 'morning', icon: Sun, display: '8:03 AM' },
-  { slot: 'day', label: 'day', icon: Flower, display: '3:41 PM' },
-  { slot: 'evening', label: 'evening', icon: Moon, display: '8:22 PM' },
+  { slot: 'morning', label: 'Morning', icon: Sun, display: '8:00 AM', hour: 8, minute: 0 },
+  { slot: 'day', label: 'Day', icon: Cloud, display: '3:00 PM', hour: 15, minute: 0 },
+  { slot: 'night', label: 'Night', icon: Moon, display: '9:00 PM', hour: 21, minute: 0 },
 ];
 
 export default function NotificationSettingsScreen() {
   const router = useRouter();
   const { session } = useAuth();
-  const [selected, setSelected] = useState<ReminderTimeSlot | null>(null);
+  const [selected, setSelected] = useState<ReminderSlot | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [activeSlot, setActiveSlot] = useState<ReminderSlot | null>(null);
+
+  const [reminders, setReminders] = useState<Record<ReminderSlot, { hour: number; minute: number }>>({
+    morning: { hour: 8, minute: 0 },
+    day: { hour: 15, minute: 0 },
+    night: { hour: 21, minute: 0 },
+  });
 
   useEffect(() => {
     const loadPref = async () => {
       const pref = await NotificationService.getUserPreference();
-      if (pref) setSelected(pref.slot);
+      if (pref) {
+        // Try to match stored hour/minute to one of our predefined slots
+        const match = OPTIONS.find(o => o.hour === pref.hour && o.minute === pref.minute);
+        if (match) setSelected(match.slot);
+      }
       setLoading(false);
     };
     loadPref();
   }, []);
 
+  const formatTime = (hour: number, minute: number) => {
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const h = hour % 12 === 0 ? 12 : hour % 12;
+    const m = minute.toString().padStart(2, '0');
+    return `${h}:${m} ${ampm}`;
+  };
+
   const handleSave = async () => {
     if (!selected) return;
     setProcessing(true);
     try {
-      await NotificationService.scheduleDailyReminder(selected);
+      const timeToSave = reminders[selected];
+      if (!timeToSave) throw new Error('Invalid selection');
+      await NotificationService.scheduleDailyReminder(timeToSave.hour, timeToSave.minute, selected);
       Alert.alert('Updated', 'Reminder time saved.');
       router.back();
     } catch (e) {
@@ -71,7 +99,23 @@ export default function NotificationSettingsScreen() {
     }
   };
 
-  const toggle = (slot: ReminderTimeSlot) => setSelected(slot);
+  const toggle = (slot: ReminderSlot) => setSelected(slot);
+
+  const openTimePicker = (slot: ReminderSlot) => {
+    setActiveSlot(slot);
+    setModalVisible(true);
+  };
+
+  const handleTimeSave = (time: { hour: number; minute: number }) => {
+    if (activeSlot) {
+      setReminders(prev => ({
+        ...prev,
+        [activeSlot]: time,
+      }));
+      setSelected(activeSlot);
+      setModalVisible(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -79,53 +123,178 @@ export default function NotificationSettingsScreen() {
     );
   }
 
+  const handleClose = () => {
+    log.info('NotificationSettings close button pressed');
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/');
+    }
+  };
+
+  const renderCard = (option: TimeOptionDef) => {
+    const Icon = option.icon;
+    const active = selected === option.slot;
+    const displayTime = formatTime(reminders[option.slot].hour, reminders[option.slot].minute);
+
+    return (
+      <View key={option.slot} style={styles.card}>
+        <View style={styles.cardLeft}>
+          <Icon color={TEXT_SECONDARY} size={24} />
+          <Text style={styles.cardLabel}>{option.label}</Text>
+        </View>
+        <View style={styles.cardRight}>
+          <TouchableOpacity onPress={() => openTimePicker(option.slot)}>
+            <Text style={styles.timeText}>{displayTime}</Text>
+          </TouchableOpacity>
+          <Switch
+            trackColor={{ false: BORDER_COLOR, true: ACCENT_PRIMARY }}
+            thumbColor={active ? PRIMARY_BACKGROUND : TEXT_SECONDARY}
+            onValueChange={() => toggle(option.slot)}
+            value={active}
+          />
+        </View>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Notification settings</Text>
-      <Text style={styles.subtitle}>Choose when to receive your daily motivation</Text>
-      <View style={styles.row}>
-        {OPTIONS.map(o => {
-          const Icon = o.icon;
-          const active = selected === o.slot;
-          return (
-            <View key={o.slot} style={styles.col}>
-              <Icon color={ACCENT_PRIMARY} size={24} />
-              <Text style={styles.label}>{o.label}</Text>
-              <View style={styles.bubble}><Text style={styles.time}>{o.display}</Text></View>
-              <Switch
-                value={active}
-                onValueChange={() => toggle(o.slot)}
-                thumbColor={active ? '#121820' : '#FFFFFF'}
-                trackColor={{ true: ACCENT_PRIMARY, false: BORDER_COLOR }}
-              />
-            </View>
-          );
-        })}
+      <View style={styles.innerContainer}>
+        <View>
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={handleClose}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            accessibilityLabel="Close notification settings"
+            accessibilityRole="button"
+          >
+            <XIcon color="#9CA3AF" size={28} />
+          </TouchableOpacity>
+          <Text style={styles.title}>Reminders</Text>
+          <Text style={styles.subtitle}>Choose when you'd like a gentle nudge.</Text>
+        </View>
+
+        <View style={styles.cardsContainer}>
+          {OPTIONS.map(renderCard)}
+        </View>
+
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={processing || !selected}>
+            {processing ? <ActivityIndicator color={PRIMARY_BACKGROUND} /> : <Text style={styles.saveTxt}>Save</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.disableBtn} onPress={handleDisable} disabled={processing}>
+            <Text style={styles.disableTxt}>Disable reminders</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-      <View style={{ marginTop: 'auto' }}>
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={processing || !selected}>
-          {processing ? <ActivityIndicator color="#121820" /> : <Text style={styles.saveTxt}>Save</Text>}
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.disableBtn} onPress={handleDisable} disabled={processing}>
-          <Text style={styles.disableTxt}>Disable reminders</Text>
-        </TouchableOpacity>
-      </View>
+
+      {activeSlot && (
+        <TimePickerModal
+          visible={modalVisible}
+          onClose={() => setModalVisible(false)}
+          onSave={handleTimeSave}
+          initialHour={activeSlot ? reminders[activeSlot].hour : 8}
+          initialMinute={activeSlot ? reminders[activeSlot].minute : 0}
+        />
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000', padding: 24 },
-  centered: { flex:1, justifyContent:'center', alignItems:'center', backgroundColor:'#000' },
-  title: { color: TEXT_PRIMARY, fontFamily:'Inter-Bold', fontSize:28 },
-  subtitle: { color: TEXT_SECONDARY, marginTop:8, fontFamily:'Inter-Regular', fontSize:16 },
-  row: { flexDirection:'row', justifyContent:'space-between', marginTop:48 },
-  col: { alignItems:'center', flex:1 },
-  label: { marginTop:8, color:ACCENT_PRIMARY, fontFamily:'Inter-SemiBold', textTransform:'lowercase' },
-  bubble: { marginTop:16, backgroundColor:COMPONENT_BG, borderRadius:24, borderWidth:1, borderColor:BORDER_COLOR, paddingVertical:10, paddingHorizontal:14 },
-  time: { color: TEXT_PRIMARY, fontFamily:'Inter-Regular', fontSize:15 },
-  saveBtn: { marginTop:40, backgroundColor:TEXT_SECONDARY, paddingVertical:16, borderRadius:50, alignItems:'center' },
-  saveTxt: { color:'#121820', fontFamily:'Inter-SemiBold', fontSize:16 },
-  disableBtn: { marginTop:20, alignItems:'center' },
-  disableTxt: { color:TEXT_TERTIARY, fontFamily:'Inter-Regular' },
+  container: {
+    flex: 1,
+    backgroundColor: PRIMARY_BACKGROUND,
+  },
+  innerContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+    justifyContent: 'space-between',
+    position: 'relative',
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 16,
+    right: 0,
+    zIndex: 10,
+    padding: 8,
+    backgroundColor: 'transparent',
+  },
+  title: {
+    color: TEXT_PRIMARY,
+    fontFamily: 'Inter-Bold',
+    fontSize: 32,
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  subtitle: {
+    color: TEXT_SECONDARY,
+    marginTop: 12,
+    fontFamily: 'Inter-Regular',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 40,
+  },
+  cardsContainer: {
+    gap: 16,
+  },
+  card: {
+    backgroundColor: COMPONENT_BG,
+    borderRadius: 16,
+    padding: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  cardRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  cardLabel: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 18,
+    color: TEXT_PRIMARY,
+  },
+  timeText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 16,
+    color: ACCENT_PRIMARY,
+  },
+  saveBtn: {
+    marginTop: 40,
+    backgroundColor: '#F5F5F0',
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  saveTxt: {
+    color: '#121820',
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+  },
+  disableBtn: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  disableTxt: {
+    color: TEXT_TERTIARY,
+    fontFamily: 'Inter-Regular',
+  },
+  buttonContainer: {
+    marginTop: 'auto',
+    marginBottom: 40,
+  },
 }); 

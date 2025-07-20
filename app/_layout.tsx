@@ -90,6 +90,7 @@ function RootLayoutNav() {
     const inReframeScreen = segments[0] === 'reframe';
     const inGuideScreen = segments[0] === 'guide';
     const inEntryDetailScreen = segments[0] === 'entry-detail';
+    const inNotificationSettingsScreen = segments[0] === 'notification-settings';
     const onSuccessScreen = segments.join('/').includes('success'); // Check if we're on the success screen
 
     navLogger.info('Navigation state evaluation', {
@@ -103,6 +104,7 @@ function RootLayoutNav() {
       inReframeScreen,
       inGuideScreen,
       inEntryDetailScreen,
+      inNotificationSettingsScreen,
       onSuccessScreen,
       fullSegments: segments
     });
@@ -155,7 +157,7 @@ function RootLayoutNav() {
         }
       } else {
         // Premium active – ensure user is within the main app
-        if (!inTabsGroup && !inReframeScreen && !inGuideScreen && !inEntryDetailScreen && !onSuccessScreen && !inPaywallFlow) {
+        if (!inTabsGroup && !inReframeScreen && !inGuideScreen && !inEntryDetailScreen && !inNotificationSettingsScreen && !onSuccessScreen && !inPaywallFlow) {
           navLogger.info('Premium active – redirecting to main tabs');
           router.replace('/(tabs)');
         }
@@ -178,7 +180,7 @@ function RootLayoutNav() {
       <Stack.Screen name="reframe" options={{ headerShown: false }} />
       <Stack.Screen name="paywall" options={{ headerShown: false }} />
       <Stack.Screen name="entry-detail" options={{ headerShown: false }} />
-      <Stack.Screen name="notification-settings" options={{ headerShown: false }} />
+      <Stack.Screen name="notification-settings" options={{ headerShown: false, presentation: 'modal' }} />
       <Stack.Screen name="personalizing" options={{ headerShown: false }} />
       <Stack.Screen name="trial-intro" options={{ headerShown: false }} />
       <Stack.Screen name="all-plans" options={{ headerShown: false }} />

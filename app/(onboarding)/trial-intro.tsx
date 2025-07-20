@@ -29,42 +29,51 @@ interface TimelineItem {
 const TIMELINE: TimelineItem[] = [
   {
     icon: CheckCircle,
-    title: 'today: unlock all features',
-    subtitle: 'insights, patterns, guided journals, voice journaling, extra yap time, relationship analysis, and more.',
+    title: 'Today: unlock all features',
+    subtitle: 'Insights, guided journals, voice journaling, and more.',
     accent: true,
   },
   {
     icon: Bell,
-    title: 'day 6: trial reminder',
-    subtitle: "we'll send you a reminder that your trial is ending.",
+    title: 'Day 6: trial reminder',
+    subtitle: "We'll send you a reminder that your trial is ending.",
   },
   {
     icon: Star,
-    title: 'day 7: trial ends',
-    subtitle: "you'll be charged and your subscription will start.",
+    title: 'Day 7: trial ends',
+    subtitle: "You'll be charged and your subscription will start.",
   },
 ];
 
 export default function TrialIntroScreen() {
   const router = useRouter();
   const { session, checkOnboardingStatus } = useAuth();
-  const [loadingPrice, setLoadingPrice] = useState(true);
-  const [yearlyPriceString, setYearlyPriceString] = useState<string>('');
-  const [yearlyPackageId, setYearlyPackageId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [weeklyPackage, setWeeklyPackage] = useState<SubscriptionPackage | null>(null);
   const [processing, setProcessing] = useState(false);
 
   // Fetch yearly price for copy (rule: Consistency)
   useEffect(() => {
     SubscriptionService.getAvailablePackages()
       .then((pkgs) => {
-        const yearly = pkgs.find((p) => p.product.identifier.includes('yearly') || p.packageType === 'ANNUAL');
-        if (yearly) {
-          setYearlyPriceString(yearly.product.priceString);
-          setYearlyPackageId(yearly.identifier);
+        /**
+         * The user MUST be presented with the weekly plan that contains
+         * the introductory "pay as you go" trial offer.
+         */
+        const weekly = pkgs.find((p) => p.product.identifier.includes('premium_weekly'));
+
+        if (weekly) {
+          setWeeklyPackage(weekly);
+          screenLogger.info('Found weekly package with intro offer', {
+            packageId: weekly.identifier,
+            introPrice: weekly.product.introductoryPrice?.priceString,
+          });
+        } else {
+          screenLogger.warn('Could not find the required premium_weekly package');
         }
       })
       .catch((err) => screenLogger.error('Failed to fetch packages', { error: String(err) }))
-      .finally(() => setLoadingPrice(false));
+      .finally(() => setLoading(false));
   }, []);
 
   /**
@@ -84,11 +93,11 @@ export default function TrialIntroScreen() {
   };
 
   const handleContinue = async () => {
-    if (!yearlyPackageId) return;
-    screenLogger.trackUserAction('trial_intro_continue', 'subscription', { packageId: yearlyPackageId });
+    if (!weeklyPackage) return;
+    screenLogger.trackUserAction('trial_intro_continue', 'subscription', { packageId: weeklyPackage.identifier });
     setProcessing(true);
     try {
-      const result = await SubscriptionService.purchasePackage(yearlyPackageId);
+      const result = await SubscriptionService.purchasePackage(weeklyPackage.identifier);
       await completeOnboarding(); // Mark onboarding complete on success
       if (result.success) {
         Alert.alert('Welcome!', 'Your premium subscription is now active.');
@@ -115,7 +124,7 @@ export default function TrialIntroScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         {/* Title */}
-        <Text style={styles.title}>how your 7 day free{`\n`}trial works</Text>
+        <Text style={styles.title}>How your 7 day free{`\n`}trial works</Text>
 
         {/* Timeline */}
         <View style={styles.timelineContainer}>
@@ -158,20 +167,30 @@ export default function TrialIntroScreen() {
           <Text style={styles.testimonialAuthor}>Julian</Text>
         </View>
 
-        {/* Price copy */}
-        <Text style={styles.priceCopy}>
-          pre-order special: 7-day free trial, then{' '}
-          {loadingPrice ? <Text>...</Text> : <Text>{yearlyPriceString || '$89.00/year (~$1.71/week)'}</Text>}
-        </Text>
+        {/* Dynamic price copy */}
+        <View style={styles.priceCopyContainer}>
+          {loading ? (
+            <ActivityIndicator color={TEXT_SECONDARY} style={{ height: 44 }} />
+          ) : weeklyPackage ? (
+            <Text style={styles.priceCopy}>
+              <Text style={styles.priceHighlight}>
+                {weeklyPackage.product.introductoryPrice?.priceString || weeklyPackage.product.priceString} for the first week
+              </Text>
+              , then {weeklyPackage.product.priceString}/week. Cancel anytime.
+            </Text>
+          ) : (
+            <Text style={styles.priceCopy}>Could not load plan details.</Text>
+          )}
+        </View>
 
         {/* Continue button */}
-        <TouchableOpacity style={[styles.continueButton, processing && { opacity: 0.6 }]} onPress={handleContinue} activeOpacity={0.8} disabled={processing || !yearlyPackageId}>
-          {processing ? <ActivityIndicator color={BG_PRIMARY} /> : <Text style={styles.continueButtonText}>continue</Text>}
+        <TouchableOpacity style={[styles.continueButton, processing && { opacity: 0.6 }]} onPress={handleContinue} activeOpacity={0.8} disabled={processing || !weeklyPackage}>
+          {processing ? <ActivityIndicator color={BG_PRIMARY} /> : <Text style={styles.continueButtonText}>Start Your Trial</Text>}
         </TouchableOpacity>
 
         {/* View all plans */}
         <TouchableOpacity style={styles.viewAllButton} onPress={handleViewAll}>
-          <Text style={styles.viewAllText}>view all plans</Text>
+          <Text style={styles.viewAllText}>View all plans</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -193,7 +212,6 @@ const styles = StyleSheet.create({
     color: TEXT_PRIMARY,
     marginTop: 20,
     lineHeight: 38,
-    textTransform: 'lowercase',
   },
   timelineContainer: {
     marginTop: 32,
@@ -228,7 +246,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: TEXT_PRIMARY,
     marginBottom: 4,
-    textTransform: 'lowercase',
   },
   timelineSubtitle: {
     fontFamily: 'Inter-Regular',
@@ -260,25 +277,33 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'right',
   },
-  priceCopy: {
+  priceCopyContainer: {
     marginTop: 24,
+    minHeight: 44, // prevent layout shift
+    justifyContent: 'center',
+  },
+  priceCopy: {
     fontFamily: 'Inter-Regular',
     fontSize: 14,
-    color: TEXT_PRIMARY,
+    color: TEXT_SECONDARY,
     textAlign: 'center',
+    lineHeight: 20,
+  },
+  priceHighlight: {
+    fontFamily: 'Inter-Bold',
+    color: TEXT_PRIMARY,
   },
   continueButton: {
     backgroundColor: ACCENT_PRIMARY,
-    borderRadius: 50,
+    borderRadius: 16,
     paddingVertical: 16,
     alignItems: 'center',
-    marginTop: 24,
+    marginTop: 12, // reduced from 24
   },
   continueButtonText: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
-    color: BG_PRIMARY,
-    textTransform: 'lowercase',
+    color: BG_PRIMARY, 
   },
   viewAllButton: {
     marginTop: 16,
@@ -288,6 +313,5 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     fontSize: 14,
     color: TEXT_SECONDARY,
-    textTransform: 'lowercase',
   },
 }); 

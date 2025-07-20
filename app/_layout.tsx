@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
@@ -25,6 +25,29 @@ function RootLayoutNav() {
   const { session, loading, onboardingCompleted } = useAuth();
   const router = useRouter();
   const segments = useSegments();
+
+  // Track whether the user currently has an active (trial OR paid) subscription
+  const [hasPremium, setHasPremium] = useState<boolean | null>(null);
+
+  // Fetch premium status whenever the session changes (logged in/out)
+  useEffect(() => {
+    if (!session) {
+      setHasPremium(null);
+      return;
+    }
+
+    (async () => {
+      try {
+        const premium = await SubscriptionService.hasPremiumAccess();
+        navLogger.info('Premium access evaluated', { premium });
+        setHasPremium(premium);
+      } catch (err) {
+        navLogger.error('Failed to evaluate premium access', { error: String(err) });
+        // Fail-safe: treat as no premium to block core content until resolved
+        setHasPremium(false);
+      }
+    })();
+  }, [session, segments]);
 
   /**
    * Deep link handler - logs all incoming URLs for debugging
@@ -114,16 +137,37 @@ function RootLayoutNav() {
           });
       }
     } else if (session && onboardingCompleted === true) {
-      // User is authenticated and has completed onboarding
-      // Allow access to reframe screen without redirecting
-      if (!inTabsGroup && !inReframeScreen && !inGuideScreen && !inEntryDetailScreen && !onSuccessScreen) {
-        navLogger.info('Redirecting to main app - session exists and onboarding complete');
-        router.replace('/(tabs)');
+      // Subscription gating logic
+      const inPaywallFlow = segments[0] === 'trial-intro' || segments[0] === 'paywall' || segments[0] === 'all-plans';
+
+      // Wait until premium status has been determined
+      if (hasPremium === null) {
+        navLogger.debug('Awaiting premium status evaluation...');
+        return;
+      }
+
+      if (!hasPremium) {
+        // No premium – redirect user to trial intro (hard paywall)
+        if (!inPaywallFlow) {
+          navLogger.info('No active subscription detected – redirecting to paywall');
+          router.replace('/trial-intro' as any);
+        }
+      } else {
+        // Premium active – ensure user is within the main app
+        if (!inTabsGroup && !inReframeScreen && !inGuideScreen && !inEntryDetailScreen && !onSuccessScreen && !inPaywallFlow) {
+          navLogger.info('Premium active – redirecting to main tabs');
+          router.replace('/(tabs)');
+        }
+        // If user is lingering on a paywall-related screen post-purchase, push them to main app
+        if (inPaywallFlow) {
+          navLogger.info('Premium active but user in paywall flow – navigating to main tabs');
+          router.replace('/(tabs)');
+        }
       }
     }
     // If onboardingCompleted is null, we're still checking - don't redirect yet
 
-  }, [session, loading, onboardingCompleted, segments]);
+  }, [session, loading, onboardingCompleted, segments, hasPremium]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

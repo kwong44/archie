@@ -96,18 +96,38 @@ export class NotificationService {
 
       const userId = session.user.id;
 
-      // Upsert preference (unique per user and slot)
+      /**
+       * The database table `user_notification_preferences` has a *unique* constraint on
+       * `user_id` **only** (see schema comment in PRD). In addition, the column
+       * `reminder_slot` is validated by a CHECK-constraint that accepts
+       * `"morning" | "day" | "evening"` but *not* `"night"`.
+       *
+       * 1. We therefore map the UI value `night` → `evening` before we persist.
+       * 2. We must use **onConflict: 'user_id'** so the UPSERT aligns with the
+       *    existing unique index; otherwise PostgreSQL throws an error because
+       *    there is no composite unique index on `user_id, reminder_slot`.
+       */
+
+      const dbSlot = slot === 'night' ? 'evening' : slot;
+      notificationLogger.debug('Persisting notification preference', {
+        userId,
+        originalSlot: slot,
+        dbSlot,
+        hour,
+        minute,
+      });
+
       const { error } = await supabase
         .from('user_notification_preferences')
         .upsert(
           {
             user_id: userId,
-            reminder_slot: slot,
+            reminder_slot: dbSlot,
             hour,
             minute,
             updated_at: new Date().toISOString(),
           },
-          { onConflict: 'user_id, reminder_slot' }
+          { onConflict: 'user_id' }
         );
 
       if (error) {

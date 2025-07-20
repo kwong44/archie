@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { UserService } from '@/services/userService';
 import { createContextLogger } from '@/lib/logger';
+import { SkiaArt } from '@/components/SkiaArt'; // Generative art (rule: ui-guidelines)
 
 // Screen-scoped logger (rule: Logging)
 const screenLogger = createContextLogger('PersonalizingScreen');
@@ -22,6 +23,32 @@ export default function PersonalizingScreen() {
   const router = useRouter();
   const [displayName, setDisplayName] = useState<string>('creator');
   const [isPersonalizing, setPersonalizing] = useState(false);
+
+  /**
+   * Pre-compute positions & sizes for a handful of decorative SkiaArt shapes.
+   * We memoize so they remain stable across renders (rule: Performance).
+   */
+  const artShapes = useMemo(() => {
+    const shapes = [] as Array<{
+      size: number;
+      top: number;
+      left: number;
+      isCircle: boolean;
+    }>;
+
+    // Generate 5 random shapes within a 240×240 container.
+    for (let i = 0; i < 5; i += 1) {
+      const size = 60 + Math.random() * 40; // 60-100 px
+      shapes.push({
+        size,
+        top: Math.random() * (240 - size),
+        left: Math.random() * (240 - size),
+        isCircle: Math.random() > 0.5,
+      });
+    }
+    screenLogger.debug('Generated SkiaArt shapes for personalizing screen', { shapes });
+    return shapes;
+  }, []);
 
   // Fetch a friendly display name on mount (rule: Separation of Concerns)
   useEffect(() => {
@@ -50,36 +77,56 @@ export default function PersonalizingScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Title */}
-      <Text style={styles.title}>{`Welcome to Archie, ${displayName}!`}</Text>
+      {/* Inner wrapper ensures consistent horizontal padding */}
+      <View style={styles.innerContainer}>
+        {/* Title */}
+        <Text style={styles.title}>{`Welcome to Archie, ${displayName}!`}</Text>
 
-      {/* Placeholder visual – replace with Lottie or SVG later */}
-      <View style={styles.visualPlaceholder}>
-        {isPersonalizing && <ActivityIndicator size="large" color={ACCENT_PRIMARY} />}
+        {/* Decorative generative art cluster */}
+        <View style={styles.visualContainer}>
+          {artShapes.map((shape, index) => (
+            <View
+              // eslint-disable-next-line react/no-array-index-key
+              key={index}
+              style={[
+                styles.artWrapper,
+                {
+                  top: shape.top,
+                  left: shape.left,
+                  width: shape.size,
+                  height: shape.size,
+                  borderRadius: shape.isCircle ? shape.size / 2 : 12,
+                },
+              ]}
+            >
+              <SkiaArt id={`personalizing_${index}`} />
+            </View>
+          ))}
+
+          {isPersonalizing && (
+            <ActivityIndicator
+              style={styles.activityIndicator}
+              size="large"
+              color={ACCENT_PRIMARY}
+            />
+          )}
+        </View>
+
+        {/* CTA Button */}
+        <TouchableOpacity
+          style={[styles.button, isPersonalizing && styles.buttonDisabled]}
+          onPress={handlePress}
+          activeOpacity={0.8}
+        >
+          {isPersonalizing ? (
+            <Text style={styles.buttonText}>Personalizing your experience...</Text>
+          ) : (
+            <Text style={styles.buttonText}>Get started</Text>
+          )}
+        </TouchableOpacity>
+
+       
       </View>
-
-      {/* Pagination dots mimic screenshot – static */}
-      <View style={styles.dotsContainer}>
-        <View style={[styles.dot, styles.dotActive]} />
-        <View style={styles.dot} />
-        <View style={styles.dot} />
-      </View>
-
-      {/* CTA Button */}
-      <TouchableOpacity
-        style={[styles.button, isPersonalizing && styles.buttonDisabled]}
-        onPress={handlePress}
-        activeOpacity={0.8}
-      >
-        {isPersonalizing ? (
-          <Text style={styles.buttonText}>Personalizing your experience...</Text>
-        ) : (
-          <Text style={styles.buttonText}>Get started</Text>
-        )}
-      </TouchableOpacity>
-
-      {/* Progress bar placeholder */}
-      <View style={styles.progressBar} />
     </SafeAreaView>
   );
 }
@@ -88,8 +135,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: BG_PRIMARY,
+  },
+  /** Matches ReminderSetupScreen layout */
+  innerContainer: {
+    flex: 1,
     paddingHorizontal: 24,
-    justifyContent: 'space-between', // keep title top, progress bar bottom
+    justifyContent: 'space-between',
   },
   title: {
     fontFamily: 'Inter-Bold',
@@ -97,37 +148,31 @@ const styles = StyleSheet.create({
     color: TEXT_PRIMARY,
     marginTop: 20,
     lineHeight: 38,
+    textAlign: 'center', // Centered like ReminderSetup header (rule: ui-guidelines)
   },
-  visualPlaceholder: {
+  visualContainer: {
     alignSelf: 'center',
     width: 240,
     height: 240,
-    borderRadius: 120,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    position: 'relative',
   },
-  dotsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 20,
+  artWrapper: {
+    position: 'absolute',
+    overflow: 'hidden',
   },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: TEXT_SECONDARY,
-    marginHorizontal: 4,
-  },
-  dotActive: {
-    backgroundColor: ACCENT_PRIMARY,
-    width: 24,
+  activityIndicator: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -12,
+    marginTop: -12,
   },
   button: {
-    backgroundColor: ACCENT_PRIMARY,
-    borderRadius: 50,
+    backgroundColor: '#F5F5F0',
+    borderRadius: 16,
     paddingVertical: 16,
     alignItems: 'center',
+    alignSelf: 'stretch', // stretches within padded container
     marginBottom: 32,
   },
   buttonDisabled: {
@@ -137,12 +182,5 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
     color: BG_PRIMARY,
-  },
-  progressBar: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: TEXT_SECONDARY,
-    marginBottom: 12,
-    alignSelf: 'stretch',
   },
 }); 

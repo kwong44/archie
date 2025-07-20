@@ -11,7 +11,6 @@ export enum SubscriptionTier {
    * This value is used as a safe fallback whenever no premium entitlement is detected.
    */
   FREE = 'free',
-  TRIAL = 'trial',
   PREMIUM_WEEKLY = 'premium_weekly',
   PREMIUM_MONTHLY = 'premium_monthly',
   PREMIUM_YEARLY = 'premium_yearly'
@@ -23,6 +22,8 @@ export enum SubscriptionTier {
 export interface SubscriptionStatus {
   isActive: boolean;
   tier: SubscriptionTier;
+  /** The type of the current billing period (TRIAL, INTRO, NORMAL) */
+  periodType?: 'TRIAL' | 'INTRO' | 'NORMAL';
   expiresAt?: Date;
   willRenew?: boolean;
   productIdentifier?: string;
@@ -41,6 +42,15 @@ export interface SubscriptionPackage {
     priceString: string;
     price: number;
     currencyCode: string;
+    /** Details about an introductory offer, if available for the user */
+    introductoryPrice?: {
+      price: number;
+      priceString: string;
+      period: string;
+      cycles: number;
+      periodUnit: 'DAY' | 'WEEK' | 'MONTH' | 'YEAR' | 'UNKNOWN';
+      periodNumberOfUnits: number;
+    } | null;
   };
 }
 
@@ -150,9 +160,7 @@ export class SubscriptionService {
       
       // Determine subscription tier based on product ID
       let tier: SubscriptionTier;
-      if (productId.includes('trial')) {
-        tier = SubscriptionTier.TRIAL;
-      } else if (productId.includes('weekly')) {
+      if (productId.includes('weekly')) {
         tier = SubscriptionTier.PREMIUM_WEEKLY;
       } else if (productId.includes('monthly')) {
         tier = SubscriptionTier.PREMIUM_MONTHLY;
@@ -160,12 +168,14 @@ export class SubscriptionService {
         tier = SubscriptionTier.PREMIUM_YEARLY;
       } else {
         // If product identifier doesn't match known tiers, fall back to MONTHLY to minimise feature lockouts
+        logger.warn('Unmapped product ID, defaulting tier to monthly', { productId });
         tier = SubscriptionTier.PREMIUM_MONTHLY;
       }
 
       const status: SubscriptionStatus = {
         isActive: true,
         tier,
+        periodType: premiumEntitlement.periodType as any, // Cast because RC types are strings
         expiresAt: premiumEntitlement.expirationDate ? new Date(premiumEntitlement.expirationDate) : undefined,
         willRenew: premiumEntitlement.willRenew,
         productIdentifier: productId
@@ -211,7 +221,15 @@ export class SubscriptionService {
           title: pkg.product.title,
           priceString: pkg.product.priceString,
           price: pkg.product.price,
-          currencyCode: pkg.product.currencyCode
+          currencyCode: pkg.product.currencyCode,
+          introductoryPrice: pkg.product.introductoryPrice ? {
+            price: pkg.product.introductoryPrice.price,
+            priceString: pkg.product.introductoryPrice.priceString,
+            period: pkg.product.introductoryPrice.period,
+            cycles: pkg.product.introductoryPrice.cycles,
+            periodUnit: pkg.product.introductoryPrice.periodUnit,
+            periodNumberOfUnits: pkg.product.introductoryPrice.periodNumberOfUnits
+          } : null
         }
       }));
 

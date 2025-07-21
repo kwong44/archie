@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -23,8 +23,22 @@ const modalLogger = createContextLogger('AddWordPairModal');
 interface AddWordPairModalProps {
   visible: boolean;
   onClose: () => void;
-  onWordPairAdded: (wordPair: WordPair) => void;
+  /**
+   * Callback fired when a new word pair is added (create mode)
+   */
+  onWordPairAdded?: (wordPair: WordPair) => void;
+  /**
+   * Callback fired when an existing word pair is updated (edit mode)
+   */
+  onWordPairUpdated?: (wordPair: WordPair) => void;
+  /**
+   * The authenticated user ID – required for Supabase writes
+   */
   userId: string;
+  /**
+   * If provided, modal is shown in *edit* mode and these initial values are pre-filled
+   */
+  existingWordPair?: WordPair;
 }
 
 /**
@@ -36,12 +50,44 @@ export const AddWordPairModal: React.FC<AddWordPairModalProps> = ({
   visible,
   onClose,
   onWordPairAdded,
+  onWordPairUpdated,
   userId,
+  existingWordPair,
 }) => {
+  /**
+   * Local form state. Values are initialised differently depending on
+   * whether the modal is in *create* or *edit* mode.  */
   const [oldWord, setOldWord] = useState('');
   const [newWord, setNewWord] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
+
+  /**
+   * `true` when the modal is editing an existing word pair.
+   * We treat the presence of `existingWordPair` as the discriminator.  */
+  const isEditMode = !!existingWordPair;
+
+  /**
+   * When the modal becomes visible, populate form fields for edit mode or
+   * reset them for create mode. Using `useEffect` allows us to react to
+   * prop changes without manual intervention from the parent.  */
+  useEffect(() => {
+    if (!visible) return; // Do nothing when modal hidden
+
+    if (isEditMode && existingWordPair) {
+      modalLogger.debug('Prefilling word pair form for editing', {
+        wordPairId: existingWordPair.id,
+      });
+
+      setOldWord(existingWordPair.old_word);
+      setNewWord(existingWordPair.new_word);
+      setDescription(existingWordPair.description ?? '');
+    } else {
+      // Fresh state for creation flow
+      resetForm();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, isEditMode, existingWordPair]);
 
   /**
    * Resets all form fields to empty state
@@ -57,7 +103,7 @@ export const AddWordPairModal: React.FC<AddWordPairModalProps> = ({
    * Handles closing the modal and resetting form state
    */
   const handleClose = (): void => {
-    modalLogger.info('Closing add word pair modal');
+    modalLogger.info('Closing word pair modal');
     resetForm();
     onClose();
   };
@@ -93,11 +139,13 @@ export const AddWordPairModal: React.FC<AddWordPairModalProps> = ({
    * Validates input, calls service, and updates parent component
    */
   const handleSubmit = async (): Promise<void> => {
-    modalLogger.info('Attempting to add new word pair', {
+    modalLogger.info(isEditMode ? 'Attempting to update word pair' : 'Attempting to add new word pair', {
       userId,
+      mode: isEditMode ? 'edit' : 'create',
+      wordPairId: existingWordPair?.id,
       oldWordLength: oldWord.length,
       newWordLength: newWord.length,
-      hasDescription: !!description.trim()
+      hasDescription: !!description.trim(),
     });
 
     if (!validateForm()) {
@@ -107,39 +155,68 @@ export const AddWordPairModal: React.FC<AddWordPairModalProps> = ({
     setLoading(true);
 
     try {
-      const newWordPair = await LexiconService.addWordPair(
-        userId,
-        oldWord.trim(),
-        newWord.trim(),
-        description.trim() || undefined
-      );
+      if (isEditMode && existingWordPair) {
+        // === Edit Flow ===
+        const updated = await LexiconService.updateWordPair(
+          userId,
+          existingWordPair.id,
+          {
+            old_word: oldWord.trim(),
+            new_word: newWord.trim(),
+            description: description.trim() || undefined,
+          }
+        );
 
-      modalLogger.info('Word pair added successfully', {
-        wordPairId: newWordPair.id,
-        transformation: `${newWordPair.old_word} → ${newWordPair.new_word}`
-      });
+        modalLogger.info('Word pair updated successfully', {
+          wordPairId: updated.id,
+          transformation: `${updated.old_word} → ${updated.new_word}`,
+        });
 
-      // Notify parent component
-      onWordPairAdded(newWordPair);
+        // Notify parent
+        onWordPairUpdated?.(updated);
 
-      // Show success message
-      Alert.alert(
-        'Word Pair Added!',
-        `Successfully added "${newWordPair.old_word} → ${newWordPair.new_word}" to your lexicon.`,
-        [{ text: 'Great!' }]
-      );
+        Alert.alert(
+          'Word Pair Updated!',
+          `Successfully updated "${updated.old_word} → ${updated.new_word}".`,
+          [{ text: 'Great!' }]
+        );
 
-      // Close modal and reset form
+      } else {
+        // === Create Flow ===
+        const newWordPair = await LexiconService.addWordPair(
+          userId,
+          oldWord.trim(),
+          newWord.trim(),
+          description.trim() || undefined,
+        );
+
+        modalLogger.info('Word pair added successfully', {
+          wordPairId: newWordPair.id,
+          transformation: `${newWordPair.old_word} → ${newWordPair.new_word}`,
+        });
+
+        onWordPairAdded?.(newWordPair);
+
+        Alert.alert(
+          'Word Pair Added!',
+          `Successfully added "${newWordPair.old_word} → ${newWordPair.new_word}" to your lexicon.`,
+          [{ text: 'Great!' }]
+        );
+      }
+
+      // Close modal for both flows
       handleClose();
 
     } catch (error) {
-      modalLogger.error('Failed to add word pair', {
+      const actionLabel = isEditMode ? 'update' : 'add';
+      modalLogger.error(`Failed to ${actionLabel} word pair`, {
         userId,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        wordPairId: existingWordPair?.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
 
       Alert.alert(
-        'Error Adding Word Pair',
+        `Error ${isEditMode ? 'Updating' : 'Adding'} Word Pair`,
         error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.',
         [{ text: 'OK' }]
       );
@@ -164,9 +241,9 @@ export const AddWordPairModal: React.FC<AddWordPairModalProps> = ({
             {/* Header */}
             <View style={styles.header}>
               <View style={styles.headerLeft}>
-                <Text style={styles.title}>Add Word Pair</Text>
+                <Text style={styles.title}>{isEditMode ? 'Edit Word Pair' : 'Add Word Pair'}</Text>
                 <Text style={styles.subtitle}>
-                  Create a new transformation for your lexicon
+                  {isEditMode ? 'Modify your existing transformation' : 'Create a new transformation for your lexicon'}
                 </Text>
               </View>
               <TouchableOpacity 
@@ -265,7 +342,7 @@ export const AddWordPairModal: React.FC<AddWordPairModalProps> = ({
                 {loading ? (
                   <ActivityIndicator color="#121820" size="small" />
                 ) : (
-                  <Text style={styles.primaryButtonText}>Add Word Pair</Text>
+                  <Text style={styles.primaryButtonText}>{isEditMode ? 'Save Changes' : 'Add Word Pair'}</Text>
                 )}
               </TouchableOpacity>
             </View>

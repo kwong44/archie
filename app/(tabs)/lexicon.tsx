@@ -46,6 +46,14 @@ export default function LexiconScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
 
+  // --- Edit modal state management ---
+  /**
+   * When non-null, the Lexicon screen is in *edit* mode and this word pair will
+   * be passed down to the modal for editing. We keep a separate visibility flag
+   * to decouple "selected item" from "modal open" for safer state handling. */
+  const [wordPairBeingEdited, setWordPairBeingEdited] = useState<WordPair | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+
   /**
    * Loads word pairs and statistics from Supabase
    */
@@ -124,6 +132,45 @@ export default function LexiconScreen() {
   };
 
   /**
+   * Handles editing an existing word pair – opens the modal with the selected
+   * pair pre-filled for editing.
+   */
+  const handleEditWordPair = (wordPair: WordPair) => {
+    lexiconLogger.info('Opening edit word pair modal', {
+      userId: session?.user?.id,
+      wordPairId: wordPair.id,
+    });
+
+    setWordPairBeingEdited(wordPair);
+    setShowEditModal(true);
+  };
+
+  /**
+   * Callback fired by the modal when a word pair is updated successfully.
+   * We update local state optimistically to reflect the changes without a
+   * full refetch, and then refresh the stats for accuracy.
+   */
+  const handleWordPairUpdated = (updated: WordPair) => {
+    lexiconLogger.info('Word pair updated – refreshing local state', {
+      wordPairId: updated.id,
+    });
+
+    // Replace the old pair with the updated one
+    setWordPairs(prev => prev.map(p => (p.id === updated.id ? updated : p)));
+
+    // Refresh stats asynchronously (non-blocking UI)
+    if (session?.user) {
+      LexiconService.getLexiconStats(session.user.id)
+        .then(setStats)
+        .catch(error =>
+          lexiconLogger.error('Failed to refresh stats after update', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+          }),
+        );
+    }
+  };
+
+  /**
    * Handles successful word pair addition
    * Updates local state and refreshes data
    */
@@ -149,18 +196,6 @@ export default function LexiconScreen() {
           });
         });
     }
-  };
-
-  /**
-   * Handles editing an existing word pair
-   * TODO: Implement edit word pair functionality
-   */
-  const handleEditWordPair = (wordPair: WordPair) => {
-    Alert.alert(
-      'Edit Word Pair',
-      `Edit "${wordPair.old_word} → ${wordPair.new_word}"?\n\nEditing feature coming soon!`,
-      [{ text: 'OK' }]
-    );
   };
 
   // Loading state
@@ -342,6 +377,20 @@ export default function LexiconScreen() {
           onClose={() => setShowAddModal(false)}
           onWordPairAdded={handleWordPairAdded}
           userId={session.user.id}
+        />
+      )}
+
+      {/* Edit Word Pair Modal */}
+      {session?.user && wordPairBeingEdited && (
+        <AddWordPairModal
+          visible={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setWordPairBeingEdited(null);
+          }}
+          userId={session.user.id}
+          existingWordPair={wordPairBeingEdited}
+          onWordPairUpdated={handleWordPairUpdated}
         />
       )}
     </SafeAreaView>

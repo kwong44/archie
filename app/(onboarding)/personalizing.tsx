@@ -25,28 +25,34 @@ export default function PersonalizingScreen() {
   const [isPersonalizing, setPersonalizing] = useState(false);
 
   /**
-   * Pre-compute positions & sizes for a handful of decorative SkiaArt shapes.
-   * We memoize so they remain stable across renders (rule: Performance).
+   * Pre-compute positions & sizes for decorative SkiaArt shapes.
+   * Shapes now use deterministic positions + smaller sizes to keep
+   * the layout consistent across screen mounts (rule: Performance, UI-Guidelines).
    */
   const artShapes = useMemo(() => {
-    const shapes = [] as Array<{
-      size: number;
-      top: number;
-      left: number;
-      isCircle: boolean;
-    }>;
+    /**
+     * Pre-defined positions ensure visual stability instead of random placement.
+     * All coordinates are within the 240×240 visual container.
+     */
+    const PREDEFINED_POSITIONS: Array<{ top: number; left: number }> = [
+      { top: 10, left: 10 },
+      { top: 40, left: 160 },
+      { top: 100, left: 40 },
+      { top: 150, left: 140 },
+      { top: 70, left: 90 },
+    ];
 
-    // Generate 5 random shapes within a 240×240 container.
-    for (let i = 0; i < 5; i += 1) {
-      const size = 60 + Math.random() * 40; // 60-100 px
-      shapes.push({
-        size,
-        top: Math.random() * (240 - size),
-        left: Math.random() * (240 - size),
-        isCircle: Math.random() > 0.5,
-      });
-    }
-    screenLogger.debug('Generated SkiaArt shapes for personalizing screen', { shapes });
+    // Smaller, varied sizes (40-60 px) compared to previous 60-100 px.
+    const SIZES = [40, 48, 36, 52, 44];
+
+    const shapes = PREDEFINED_POSITIONS.map((pos, index) => ({
+      size: SIZES[index],
+      ...pos,
+      // Alternate shape type for subtle variety, yet deterministic
+      isCircle: index % 2 === 0,
+    }));
+
+    screenLogger.debug('Prepared deterministic SkiaArt shapes', { shapes });
     return shapes;
   }, []);
 

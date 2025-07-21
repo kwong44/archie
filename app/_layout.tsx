@@ -90,6 +90,7 @@ function RootLayoutNav() {
     const inReframeScreen = segments[0] === 'reframe';
     const inGuideScreen = segments[0] === 'guide';
     const inEntryDetailScreen = segments[0] === 'entry-detail';
+    const inChangeSubscriptionScreen = segments[0] === 'change-subscription';
     const inNotificationSettingsScreen = segments[0] === 'notification-settings';
     const inProfileScreen = segments[0] === 'profile';
     const inHelpScreen = segments[0] === 'help';
@@ -107,6 +108,7 @@ function RootLayoutNav() {
       inReframeScreen,
       inGuideScreen,
       inEntryDetailScreen,
+      inChangeSubscriptionScreen,
       inNotificationSettingsScreen,
       inProfileScreen,
       inHelpScreen,
@@ -163,7 +165,7 @@ function RootLayoutNav() {
         }
       } else {
         // Premium active – ensure user is within the main app
-        if (!inTabsGroup && !inReframeScreen && !inGuideScreen && !inEntryDetailScreen && !inNotificationSettingsScreen && !inProfileScreen && !inHelpScreen && !inPrivacyScreen && !onSuccessScreen && !inPaywallFlow) {
+        if (!inTabsGroup && !inReframeScreen && !inGuideScreen && !inEntryDetailScreen && !inChangeSubscriptionScreen && !inNotificationSettingsScreen && !inProfileScreen && !inHelpScreen && !inPrivacyScreen && !onSuccessScreen && !inPaywallFlow) {
           navLogger.info('Premium active – redirecting to main tabs');
           router.replace('/(tabs)');
         }
@@ -193,6 +195,7 @@ function RootLayoutNav() {
       <Stack.Screen name="personalizing" options={{ headerShown: false }} />
       <Stack.Screen name="trial-intro" options={{ headerShown: false }} />
       <Stack.Screen name="all-plans" options={{ headerShown: false }} />
+      <Stack.Screen name="change-subscription" options={{ headerShown: false, presentation: 'modal' }} />
       <Stack.Screen name="reminder-setup" options={{ headerShown: false }} />
       <Stack.Screen name="+not-found" />
     </Stack>

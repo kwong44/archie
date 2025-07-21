@@ -161,14 +161,27 @@ const GuideScreen: React.FC = () => {
     }
   };
 
+  // Personal settings – dynamically include subscription management when premium is active
+  const personalItems: SettingsItem[] = [
+    { icon: User, label: 'Profile', description: 'Manage your info', onPress: () => router.push('/profile' as any) },
+    { icon: Bell, label: 'Notifications', description: 'Customize reminders', onPress: () => router.push('/notification-settings' as any) },
+  ];
+
+  // Add "Change Subscription" button only for premium users
+  if (hasPremium) {
+    personalItems.push({
+      icon: Heart,
+      label: 'Change Subscription',
+      description: 'Switch your plan',
+      onPress: () => router.push('/change-subscription' as any),
+    });
+  }
+
   // Settings Sections definition
   const settingsSections: SettingsSection[] = [
     {
       title: 'Personal',
-      items: [
-        { icon: User, label: 'Profile', description: 'Manage your info', onPress: () => router.push('/profile' as any) },
-        { icon: Bell, label: 'Notifications', description: 'Customize reminders', onPress: () => router.push('/notification-settings' as any) },
-      ],
+      items: personalItems,
     },
     {
       title: 'Support',

@@ -1,5 +1,5 @@
 import Purchases, { PurchasesPackage, CustomerInfo, PurchasesOffering, LOG_LEVEL } from 'react-native-purchases';
-import { Platform } from 'react-native';
+import { Platform, Linking } from 'react-native';
 import { logger } from '@/lib/logger';
 
 /**
@@ -375,6 +375,33 @@ export class SubscriptionService {
       logger.error('Failed to sign out from RevenueCat', { 
         error: error instanceof Error ? error.message : 'Unknown error' 
       });
+    }
+  }
+
+  /**
+   * Opens the native subscription management screen so the user can cancel or
+   * modify their plan via the App Store / Google Play. RevenueCat recommends
+   * deep-linking users rather than handling cancellations via support. (Rule: Security-First)
+   */
+  static async openManageSubscription(): Promise<void> {
+    try {
+      logger.info('Opening native subscription management', { platform: Platform.OS });
+
+      const url = Platform.OS === 'ios'
+        ? 'https://apps.apple.com/account/subscriptions'
+        : Platform.OS === 'android'
+          ? 'https://play.google.com/store/account/subscriptions'
+          : undefined;
+
+      if (!url) {
+        logger.warn('Unsupported platform for subscription management', { platform: Platform.OS });
+        return;
+      }
+
+      await Linking.openURL(url);
+    } catch (error) {
+      logger.error('Failed to open subscription management URL', { error });
+      throw error;
     }
   }
 } 

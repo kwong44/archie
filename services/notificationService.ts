@@ -63,8 +63,8 @@ export class NotificationService {
     // Schedule the local notification to repeat daily at the desired time
     const identifier = await Notifications.scheduleNotificationAsync({
       content: {
-        title: 'Time for your me-time ✨',
-        body: 'Open The Architect to transform your language and reality.',
+        title: 'Time for your me-time',
+        body: 'Open Archie and take a moment for yourself.',
       },
       trigger: {
         hour,

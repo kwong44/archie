@@ -225,10 +225,14 @@ const GuideScreen: React.FC = () => {
           <View key={section.title} style={styles.section}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
             <View style={styles.sectionItems}>
-              {section.items.map((item) => (
+              {section.items.map((item, index, arr) => (
                 <TouchableOpacity
                   key={item.label}
-                  style={[styles.settingItem, item.isSignOut && styles.signOutItem, item.disabled && styles.disabledItem]}
+                  style={[
+                    styles.settingItem,
+                    (item.isSignOut || index === arr.length - 1) && styles.signOutItem,
+                    item.disabled && styles.disabledItem,
+                  ]}
                   onPress={item.onPress}
                   disabled={item.disabled}
                 >
@@ -286,9 +290,19 @@ const GuideScreen: React.FC = () => {
 // Styles (colocated for maintainability)
 // ---------------------------------------------------------------------------
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#121820' },
-  scrollContent: { padding: 20 },
-  header: { marginBottom: 30, position: 'relative', minHeight: 60, justifyContent: 'center' },
+  container: {
+    flex: 1,
+    backgroundColor: '#121820',
+  },
+  scrollContent: {
+    padding: 20,
+  },
+  header: {
+    marginBottom: 30,
+    position: 'relative',
+    minHeight: 60,
+    justifyContent: 'center',
+  },
   closeButton: {
     position: 'absolute',
     top: 0,
@@ -297,48 +311,183 @@ const styles = StyleSheet.create({
     padding: 8,
     backgroundColor: 'transparent',
   },
-  title: { fontSize: 24, fontFamily: 'Inter-Bold', color: '#F5F5F0', marginBottom: 8 },
-  subtitle: { fontSize: 16, fontFamily: 'Inter-Regular', color: '#9CA3AF' },
-  userInfo: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#374151' },
-  userEmail: { fontSize: 14, fontFamily: 'Inter-Regular', color: '#6B7280' },
-  premiumBanner: { backgroundColor: '#FFC300', borderRadius: 20, padding: 20, marginBottom: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  premiumContent: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  premiumIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(18, 24, 32, 0.1)', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
-  premiumText: { flex: 1 },
-  premiumTitle: { fontSize: 18, fontFamily: 'Inter-Bold', color: '#121820', marginBottom: 4 },
-  premiumDescription: { fontSize: 14, fontFamily: 'Inter-Regular', color: '#121820', opacity: 0.8 },
-  premiumButton: { backgroundColor: '#121820', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 },
-  premiumButtonText: { color: '#FFC300', fontFamily: 'Inter-SemiBold', fontSize: 14 },
-  premiumStatusBanner: { backgroundColor: 'rgba(16, 185, 129, 0.1)', borderRadius: 20, padding: 20, marginBottom: 30, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.3)' },
-  premiumActiveIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(16, 185, 129, 0.2)', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
-  premiumActiveTitle: { fontSize: 18, fontFamily: 'Inter-Bold', color: '#10B981', marginBottom: 4 },
-  premiumActiveDescription: { fontSize: 14, fontFamily: 'Inter-Regular', color: '#F5F5F0', opacity: 0.8 },
-  section: { marginBottom: 30 },
-  sectionTitle: { fontSize: 18, fontFamily: 'Inter-SemiBold', color: '#F5F5F0', marginBottom: 12 },
-  sectionItems: { backgroundColor: '#1F2937', borderRadius: 16, borderWidth: 1, borderColor: '#374151' },
-  settingItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#374151' },
-  signOutItem: { borderBottomWidth: 0 },
-  disabledItem: { opacity: 0.6 },
-  settingLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  settingIconContainer: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#374151', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  signOutIconContainer: { backgroundColor: 'rgba(229, 62, 62, 0.1)' },
-  settingTextContainer: { flex: 1 },
-  settingLabel: { fontSize: 16, fontFamily: 'Inter-SemiBold', color: '#F5F5F0', marginBottom: 2 },
-  signOutLabel: { color: '#E53E3E' },
-  settingDescription: { fontSize: 14, fontFamily: 'Inter-Regular', color: '#9CA3AF' },
-  appInfo: { marginBottom: 30 },
-  appInfoTitle: { fontSize: 18, fontFamily: 'Inter-SemiBold', color: '#F5F5F0', marginBottom: 16 },
-  appInfoGrid: { backgroundColor: '#1F2937', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#374151' },
-  appInfoItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#374151' },
-  lastAppInfoItem: { borderBottomWidth: 0 },
-  appInfoLabel: { fontSize: 14, fontFamily: 'Inter-Regular', color: '#9CA3AF' },
-  appInfoValue: { fontSize: 14, fontFamily: 'Inter-SemiBold', color: '#F5F5F0' },
-  philosophy: { backgroundColor: '#1F2937', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#374151', marginBottom: 20 },
-  philosophyTitle: { fontSize: 18, fontFamily: 'Inter-SemiBold', color: '#F5F5F0', marginBottom: 12 },
-  philosophyText: { fontSize: 16, fontFamily: 'Inter-Regular', color: '#F5F5F0', lineHeight: 24, marginBottom: 12, fontStyle: 'italic' },
-  philosophySignature: { fontSize: 14, fontFamily: 'Inter-SemiBold', color: '#FFC300', textAlign: 'right' },
-  loadingContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 20 },
-  loadingText: { fontSize: 14, fontFamily: 'Inter-Regular', color: '#9CA3AF', marginLeft: 10 },
+  title: {
+    fontSize: 24,
+    fontFamily: 'Inter-Bold',
+    color: '#F5F5F0',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#9CA3AF',
+  },
+  userEmail: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#6B7280',
+  },
+  premiumBanner: {
+    backgroundColor: '#FFC300',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  premiumContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  premiumIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(18, 24, 32, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  premiumText: {
+    flex: 1,
+  },
+  premiumTitle: {
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    color: '#121820',
+    marginBottom: 4,
+  },
+  premiumDescription: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#121820',
+    opacity: 0.8,
+  },
+  premiumButton: {
+    backgroundColor: '#121820',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  premiumButtonText: {
+    color: '#FFC300',
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+  },
+  section: {
+    marginBottom: 30,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontFamily: 'Inter-SemiBold',
+    color: '#F5F5F0',
+    marginBottom: 12,
+  },
+  sectionItems: {
+    backgroundColor: '#1F2937',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#374151',
+  },
+  settingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#374151',
+  },
+  signOutItem: {
+    borderBottomWidth: 0,
+  },
+  disabledItem: {
+    opacity: 0.6,
+  },
+  settingLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  settingIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#374151',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  signOutIconContainer: {
+    backgroundColor: 'rgba(229, 62, 62, 0.1)',
+  },
+  settingTextContainer: {
+    flex: 1,
+  },
+  settingLabel: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    color: '#F5F5F0',
+    marginBottom: 2,
+  },
+  signOutLabel: {
+    color: '#E53E3E',
+  },
+  settingDescription: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#9CA3AF',
+  },
+  appInfo: {
+    marginBottom: 30,
+  },
+  appInfoTitle: {
+    fontSize: 18,
+    fontFamily: 'Inter-SemiBold',
+    color: '#F5F5F0',
+    marginBottom: 16,
+  },
+  appInfoGrid: {
+    backgroundColor: '#1F2937',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#374151',
+  },
+  appInfoItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#374151',
+  },
+  lastAppInfoItem: {
+    borderBottomWidth: 0,
+  },
+  appInfoLabel: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#9CA3AF',
+  },
+  appInfoValue: {
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+    color: '#F5F5F0',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
+  loadingText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#9CA3AF',
+    marginLeft: 10,
+  },
 });
 
 export default GuideScreen; 

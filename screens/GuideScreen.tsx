@@ -166,15 +166,15 @@ const GuideScreen: React.FC = () => {
     {
       title: 'Personal',
       items: [
-        { icon: User, label: 'Profile', description: 'Manage your info' },
+        { icon: User, label: 'Profile', description: 'Manage your info', onPress: () => router.push('/profile' as any) },
         { icon: Bell, label: 'Notifications', description: 'Customize reminders', onPress: () => router.push('/notification-settings' as any) },
       ],
     },
     {
       title: 'Support',
       items: [
-        { icon: HelpCircle, label: 'Help & FAQ', description: 'Common questions' },
-        { icon: Shield, label: 'Privacy', description: 'Data protection' },
+        { icon: HelpCircle, label: 'Help & FAQ', description: 'Common questions', onPress: () => router.push('/help' as any) },
+        { icon: Shield, label: 'Privacy', description: 'Data protection', onPress: () => router.push('/privacy' as any) },
         { icon: LogOut, label: 'Sign Out', description: 'Sign out of account', isSignOut: true, onPress: handleSignOut, disabled: isSigningOut },
       ],
     },

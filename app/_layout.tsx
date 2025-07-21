@@ -91,6 +91,9 @@ function RootLayoutNav() {
     const inGuideScreen = segments[0] === 'guide';
     const inEntryDetailScreen = segments[0] === 'entry-detail';
     const inNotificationSettingsScreen = segments[0] === 'notification-settings';
+    const inProfileScreen = segments[0] === 'profile';
+    const inHelpScreen = segments[0] === 'help';
+    const inPrivacyScreen = segments[0] === 'privacy';
     const onSuccessScreen = segments.join('/').includes('success'); // Check if we're on the success screen
 
     navLogger.info('Navigation state evaluation', {
@@ -105,6 +108,9 @@ function RootLayoutNav() {
       inGuideScreen,
       inEntryDetailScreen,
       inNotificationSettingsScreen,
+      inProfileScreen,
+      inHelpScreen,
+      inPrivacyScreen,
       onSuccessScreen,
       fullSegments: segments
     });
@@ -157,7 +163,7 @@ function RootLayoutNav() {
         }
       } else {
         // Premium active – ensure user is within the main app
-        if (!inTabsGroup && !inReframeScreen && !inGuideScreen && !inEntryDetailScreen && !inNotificationSettingsScreen && !onSuccessScreen && !inPaywallFlow) {
+        if (!inTabsGroup && !inReframeScreen && !inGuideScreen && !inEntryDetailScreen && !inNotificationSettingsScreen && !inProfileScreen && !inHelpScreen && !inPrivacyScreen && !onSuccessScreen && !inPaywallFlow) {
           navLogger.info('Premium active – redirecting to main tabs');
           router.replace('/(tabs)');
         }
@@ -181,6 +187,9 @@ function RootLayoutNav() {
       <Stack.Screen name="paywall" options={{ headerShown: false }} />
       <Stack.Screen name="entry-detail" options={{ headerShown: false }} />
       <Stack.Screen name="notification-settings" options={{ headerShown: false, presentation: 'modal' }} />
+      <Stack.Screen name="profile" options={{ headerShown: false, presentation: 'modal' }} />
+      <Stack.Screen name="help" options={{ headerShown: false, presentation: 'modal' }} />
+      <Stack.Screen name="privacy" options={{ headerShown: false, presentation: 'modal' }} />
       <Stack.Screen name="personalizing" options={{ headerShown: false }} />
       <Stack.Screen name="trial-intro" options={{ headerShown: false }} />
       <Stack.Screen name="all-plans" options={{ headerShown: false }} />

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform, ScrollView, Alert, Image, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Mic, MicOff } from 'lucide-react-native';
 import Animated, { 
@@ -534,22 +534,7 @@ export default function WorkshopScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* White circle image in top right corner with hyperlink */}
-      <TouchableOpacity 
-        style={styles.topRightCircleContainer}
-        onPress={() => {
-          // Open bolt.new URL when the image is tapped
-          logger.info('Opening Bolt.new from logo click');
-          Linking.openURL('https://bolt.new/');
-        }}
-        activeOpacity={0.7}
-      >
-        <Image 
-          source={require('@/assets/images/white_circle_360x360.png')}
-          style={styles.topRightCircle}
-          resizeMode="contain"
-        />
-      </TouchableOpacity>
+
       
       <ScrollView 
         ref={scrollViewRef}
@@ -837,22 +822,5 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     fontSize: 14,
   },
-  topRightCircle: {
-    position: 'absolute',
-    top: 40,
-    right: 20,
-    width: 40,
-    height: 40,
-    zIndex: 10,
-    opacity: 0.8,
-  },
-  topRightCircleContainer: {
-    position: 'absolute',
-    top: 40,
-    right: 20,
-    width: 40,
-    height: 40,
-    zIndex: 10,
-    opacity: 0.7,
-  },
+
 });

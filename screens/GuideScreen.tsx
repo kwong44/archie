@@ -17,6 +17,7 @@ import {
   Sparkles,
   MessageCircle,
   LogOut,
+  FileText,
   X as XIcon,
 } from 'lucide-react-native';
 import { useAuth } from '@/context/AuthContext';
@@ -188,6 +189,7 @@ const GuideScreen: React.FC = () => {
       items: [
         { icon: HelpCircle, label: 'Help & FAQ', description: 'Common questions', onPress: () => router.push('/help' as any) },
         { icon: Shield, label: 'Privacy', description: 'Data protection', onPress: () => router.push('/privacy' as any) },
+        { icon: FileText, label: 'Terms of Service', description: 'Legal terms', onPress: () => router.push('/terms' as any) },
         { icon: LogOut, label: 'Sign Out', description: 'Sign out of account', isSignOut: true, onPress: handleSignOut, disabled: isSigningOut },
       ],
     },

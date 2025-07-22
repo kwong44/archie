@@ -1,30 +1,31 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { SafeAreaView, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { WebView } from 'react-native-webview';
 import { X as XIcon } from 'lucide-react-native';
 import { createContextLogger } from '@/lib/logger';
 
 // ---------------------------------------------------------------------------
-// Constants & Logger (Rule: Logging)
+// Constants & Logger
 // ---------------------------------------------------------------------------
-const log = createContextLogger('PrivacyScreen');
+const log = createContextLogger('TermsScreen');
 
-const PRIVACY_URL =
-  'https://raw.githubusercontent.com/kwong44/Archie-support/main/Privacy-Policy.md';
+const TERMS_URL =
+  'https://raw.githubusercontent.com/kwong44/Archie-support/main/Terms-Of-Service.md';
 
 const TEXT_PRIMARY = '#F5F5F0';
 const TEXT_SECONDARY = '#9CA3AF';
 const PRIMARY_BACKGROUND = '#121820';
 
-export default function PrivacyScreen() {
+/**
+ * TermsScreen renders the hosted Terms of Service inside a WebView.
+ * Loading and error states are handled with a simple indicator and logs.
+ */
+export default function TermsScreen() {
   const router = useRouter();
 
-  /**
-   * Handles closing the screen. Attempts to go back, otherwise replaces with root.
-   */
   const handleClose = () => {
-    log.info('PrivacyScreen close button pressed');
+    log.info('TermsScreen close button pressed');
     if (router.canGoBack()) {
       router.back();
     } else {
@@ -40,20 +41,20 @@ export default function PrivacyScreen() {
           style={styles.closeButton}
           onPress={handleClose}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          accessibilityLabel="Close privacy"
+          accessibilityLabel="Close terms"
           accessibilityRole="button"
         >
           <XIcon color="#9CA3AF" size={28} />
         </TouchableOpacity>
 
-        <Text style={styles.title}>Privacy Policy</Text>
-        <Text style={styles.subtitle}>Your data protection and privacy.</Text>
+        <Text style={styles.title}>Terms of Service</Text>
+        <Text style={styles.subtitle}>Legal stuff, clear and transparent.</Text>
       </View>
 
       {/* Content */}
       <View style={styles.webviewContainer}>
         <WebView
-          source={{ uri: PRIVACY_URL }}
+          source={{ uri: TERMS_URL }}
           originWhitelist={["*"]}
           style={styles.webview}
           startInLoadingState
@@ -65,8 +66,8 @@ export default function PrivacyScreen() {
           )}
           onError={(syntheticEvent) => {
             const { nativeEvent } = syntheticEvent;
-            log.error('WebView error loading privacy policy', {
-              url: PRIVACY_URL,
+            log.error('WebView error loading terms of service', {
+              url: TERMS_URL,
               message: nativeEvent.description,
             });
           }}
@@ -77,7 +78,7 @@ export default function PrivacyScreen() {
 }
 
 // ---------------------------------------------------------------------------
-// Styles (Rule: Colocated Styles)
+// Styles
 // ---------------------------------------------------------------------------
 const styles = StyleSheet.create({
   container: {

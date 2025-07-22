@@ -2,10 +2,10 @@
 alwaysApply: true
 ---
 
-PRD V1: The Architect
+PRD V1: Archie
 1. Introduction
-Product Name: The Architect
-Vision: To empower individuals to consciously reshape their reality by transforming their language. The Architect is a digital sanctuary and AI-powered guide that helps users move from a vocabulary of limitation to a language of possibility.
+Product Name: Archie
+Vision: To empower individuals to consciously reshape their reality by transforming their language. Archie is a digital sanctuary and AI-powered guide that helps users move from a vocabulary of limitation to a language of possibility.
 Objective: To launch a cross-platform mobile application (using Expo) that allows users to record their thoughts via voice, receive AI-powered assistance in reframing their language, track their mindset transformation, and cultivate a more self-authored life.
 2. User Personas & Stories
 Target User Summary: The target user is interested in self-improvement, mindfulness, and positive psychology. They believe in the power of words to shape their experience of life and are looking for a practical, engaging, and private tool for daily personal growth.
@@ -86,7 +86,7 @@ Data Export: Allow users to download their entire journal history as a CSV or JS
 
 ## 1. Goal
 
-This document outlines the **mandatory** rules and procedures for interacting with backend services (Supabase and the specialized AI backend) from the "The Architect" mobile application. The primary goals are to ensure **security**, **consistency**, and **maintainability** by standardizing how authentication, data validation, and backend requests are handled. Adherence to these guidelines is critical for preventing security vulnerabilities and ensuring predictable app behavior.
+This document outlines the **mandatory** rules and procedures for interacting with backend services (Supabase and the specialized AI backend) from "Archie" mobile application. The primary goals are to ensure **security**, **consistency**, and **maintainability** by standardizing how authentication, data validation, and backend requests are handled. Adherence to these guidelines is critical for preventing security vulnerabilities and ensuring predictable app behavior.
 
 **All new backend interactions MUST follow these guidelines without exception.**
 
@@ -294,10 +294,10 @@ Consistent error handling is key. Be prepared to handle errors from both Supabas
 *   **AI Backend Error:**
     *   **401 Unauthorized:** `Status: 401`, `Body: { "detail": "Invalid token" }`
     *   **422 Unprocessable Entity (Validation Error):** `Status: 422`, `Body: { "detail": [...] }`
-    *   **500 Internal Server Error:** `Status: 500`, `Body: { "error": "An unexpected error occurred." }`PRD V1: The Architect
+    *   **500 Internal Server Error:** `Status: 500`, `Body: { "error": "An unexpected error occurred." }`PRD V1: Archie
 1. Introduction
-Product Name: The Architect
-Vision: To empower individuals to consciously reshape their reality by transforming their language. The Architect is a digital sanctuary and AI-powered guide that helps users move from a vocabulary of limitation to a language of possibility.
+Product Name: Archie
+Vision: To empower individuals to consciously reshape their reality by transforming their language. Archie is a digital sanctuary and AI-powered guide that helps users move from a vocabulary of limitation to a language of possibility.
 Objective: To launch a cross-platform mobile application (using Expo) that allows users to record their thoughts via voice, receive AI-powered assistance in reframing their language, track their mindset transformation, and cultivate a more self-authored life.
 2. User Personas & Stories
 Target User Summary: The target user is interested in self-improvement, mindfulness, and positive psychology. They believe in the power of words to shape their experience of life and are looking for a practical, engaging, and private tool for daily personal growth.
@@ -378,7 +378,7 @@ Data Export: Allow users to download their entire journal history as a CSV or JS
 
 ## 1. Goal
 
-This document outlines the **mandatory** rules and procedures for interacting with backend services (Supabase and the specialized AI backend) from the "The Architect" mobile application. The primary goals are to ensure **security**, **consistency**, and **maintainability** by standardizing how authentication, data validation, and backend requests are handled. Adherence to these guidelines is critical for preventing security vulnerabilities and ensuring predictable app behavior.
+This document outlines the **mandatory** rules and procedures for interacting with backend services (Supabase and the specialized AI backend) from "Archie" mobile application. The primary goals are to ensure **security**, **consistency**, and **maintainability** by standardizing how authentication, data validation, and backend requests are handled. Adherence to these guidelines is critical for preventing security vulnerabilities and ensuring predictable app behavior.
 
 **All new backend interactions MUST follow these guidelines without exception.**
 

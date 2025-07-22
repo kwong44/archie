@@ -21,6 +21,8 @@ interface AnalyticsEvent {
   timestamp: string;
 }
 
+import Constants from 'expo-constants';
+
 /**
  * React Native logger utility with integrated analytics
  * Provides consistent logging format AND event tracking across the mobile app
@@ -97,11 +99,16 @@ class Logger {
 
   /**
    * Logs general information
-   * Can optionally trigger analytics events for user behavior tracking
+   * Only logs to console in development mode to avoid polluting production logs
+   * Optionally, info events can be tracked in analytics if needed
    */
   info(message: string, metadata?: Record<string, any>): void {
     const entry = this.createLogEntry('info', message, metadata);
-    console.log('ℹ️ INFO:', JSON.stringify(entry, null, 2));
+    if (__DEV__) {
+      console.log('ℹ️ INFO:', JSON.stringify(entry, null, 2));
+    }
+    // Optionally, send info-level analytics here if desired
+    // this.trackEvent('app_info', { message, ...metadata });
   }
 
   /**
@@ -212,45 +219,35 @@ class Logger {
 
   /**
    * Sends analytics events to configured providers
-   * Handles multiple analytics services (PostHog, Mixpanel, etc.)
+   * DEPRECATED: Analytics events should be sent via AnalyticsService, not directly from logger.
+   * This method is a no-op and logs a warning if called directly.
    */
   private async sendToAnalyticsProviders(event: AnalyticsEvent): Promise<void> {
-    try {
-      // Example integrations (implement based on chosen providers):
-      
-      // PostHog integration (recommended for privacy-first analytics)
-      // await this.sendToPostHog(event);
-      
-      // Mixpanel integration (for detailed user behavior)
-      // await this.sendToMixpanel(event);
-      
-      // Amplitude integration (for user journey analysis)
-      // await this.sendToAmplitude(event);
-      
-      // Custom analytics endpoint (for proprietary tracking)
-      // await this.sendToCustomAnalytics(event);
-      
-    } catch (error) {
-      // Failsafe: Don't let analytics errors crash the app
-      console.error('Failed to send analytics event:', error);
-    }
+    // NOTE: Analytics events should be sent via AnalyticsService, which has access to the PostHog instance via usePostHog().
+    // This method is a no-op to avoid context issues. See lib/analytics.ts for correct usage.
+    this.warn('sendToAnalyticsProviders should not be called directly from logger. Use AnalyticsService static methods instead.', { event });
   }
 
   /**
    * Sends critical logs to remote service in production
-   * Used for error monitoring and app health tracking
+   * Checks for EXPO_PUBLIC_API_URL and logs a warning if not set
    */
   private async sendToRemoteLogging(entry: LogEntry): Promise<void> {
     try {
-      // Example: Send to your logging API endpoint or service
-      await fetch(`${process.env.EXPO_PUBLIC_API_URL}/logs`, {
+      // Get remote logging URL from env/config
+      const apiUrl = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_URL;
+      if (!apiUrl) {
+        this.warn('EXPO_PUBLIC_API_URL is not set. Remote logging is disabled.', { entry });
+        return;
+      }
+      await fetch(`${apiUrl}/logs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(entry),
       });
     } catch (error) {
       // Failsafe: Don't let logging errors crash the app
-      console.error('Failed to send log to remote service:', error);
+      this.error('Failed to send log to remote service', { error });
     }
   }
 
@@ -275,11 +272,10 @@ class Logger {
 
   /**
    * Flushes any pending analytics events
-   * Called when app goes to background
+   * No-op in logger. Use AnalyticsService or call posthog.flush() from a component if needed.
    */
   flush(): void {
-    this.debug('Flushing analytics events');
-    // Implementation depends on chosen analytics providers
+    this.warn('logger.flush() is a no-op. Use AnalyticsService or call posthog.flush() from a component if needed.');
   }
 
   /**

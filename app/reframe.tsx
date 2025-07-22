@@ -22,14 +22,19 @@ export default function ReframeScreen() {
     selectedPrompt: selectedPromptText, 
     promptCategory, 
     promptTitle,
-    promptId 
+    promptId,
+    durationSeconds: durationSecondsParam 
   } = useLocalSearchParams<{ 
     audioUri?: string; 
     selectedPrompt?: string;
     promptCategory?: string;
     promptTitle?: string;
     promptId?: string;
+    durationSeconds?: string;
   }>();
+  
+  // Parse duration from string to number, default to 0 if not provided
+  const durationSeconds = durationSecondsParam ? parseFloat(durationSecondsParam) : 0;
   
   const [transcript, setTranscript] = useState<string>('');
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -458,7 +463,7 @@ export default function ReframeScreen() {
         ai_summary: finalAiSummary,
         description: finalAiDescription, // Include the description field
         transformations_applied: appliedTransformations,
-        session_duration_seconds: 0, // TODO: Track actual duration
+        session_duration_seconds: durationSeconds, // Duration in seconds
       });
 
       reframeLogger.info('Journal session saved successfully', {

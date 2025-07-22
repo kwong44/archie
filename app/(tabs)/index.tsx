@@ -33,6 +33,7 @@ export default function WorkshopScreen() {
   const [promptsExpanded, setPromptsExpanded] = useState(false); // New state for collapsible prompts
   const [selectedPrompt, setSelectedPrompt] = useState<JournalPrompt | null>(null); // Store selected prompt
   const recording = useRef<Audio.Recording | null>(null);
+  const recordingStartTime = useRef<number | null>(null); // Track when recording starts
   const router = useRouter();
   
   // PostHog analytics integration (our wrapper)
@@ -364,6 +365,9 @@ export default function WorkshopScreen() {
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
       });
+      
+      // Store the current timestamp when recording starts
+      recordingStartTime.current = Date.now();
 
       const { recording: newRecording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY
@@ -408,18 +412,32 @@ export default function WorkshopScreen() {
     if (!recording.current) return;
 
     try {
+      // Calculate duration in seconds, ensuring it's a valid number
+      const durationSeconds = recordingStartTime.current
+        ? parseFloat(((Date.now() - recordingStartTime.current) / 1000).toFixed(2))
+        : 0;
+
       await recording.current.stopAndUnloadAsync();
       const uri = recording.current.getURI();
       recording.current = null;
       setIsRecording(false);
 
-      // Track recording completion
+      // Reset the start time
+      recordingStartTime.current = null;
+
+      // Track recording completion with duration
       analytics.trackJournaling('recording_completed', {
-        metadata: { 
+        metadata: {
           hasAudioUri: !!uri,
           fileName: uri?.split('/').pop(),
-          fileExtension: uri?.split('.').pop()
+          fileExtension: uri?.split('.').pop(),
+          durationSeconds: String(durationSeconds) // Pass as string for analytics
         }
+      });
+
+      logger.info('Recording stopped', {
+        durationSeconds: durationSeconds,
+        audioUri: uri
       });
 
       // Animate back to normal state
@@ -439,14 +457,14 @@ export default function WorkshopScreen() {
         fileName: uri?.split('/').pop(),
         fileExtension: uri?.split('.').pop()
       });
-      
+
       // Check if URI is valid before navigation
       if (!uri) {
         logger.error('No URI received from recording - cannot navigate');
         analytics.trackError('recording_no_uri_error', 'workshop');
         return;
       }
-      
+
       // Small delay to ensure file is fully written before navigation
       logger.info('Attempting navigation to reframe screen in 500ms');
       setTimeout(() => {
@@ -455,34 +473,37 @@ export default function WorkshopScreen() {
           audioUri: uri,
           hasSelectedPrompt: !!selectedPrompt
         });
-        
+
         try {
-          // Include selected prompt information if available
-          const navigationParams: any = { audioUri: uri };
-          
+          // Include selected prompt information and duration
+          const navigationParams: any = {
+            audioUri: uri,
+            durationSeconds: String(durationSeconds) // Pass as string for navigation
+          };
+
           if (selectedPrompt) {
             navigationParams.selectedPrompt = selectedPrompt.prompt;
             navigationParams.promptCategory = selectedPrompt.category;
             navigationParams.promptTitle = selectedPrompt.title;
             navigationParams.promptId = selectedPrompt.id;
-            
+
             logger.info('Including selected prompt in navigation', {
               promptId: selectedPrompt.id,
               promptTitle: selectedPrompt.title
             });
           }
-          
+
           router.push({
             pathname: '/reframe',
             params: navigationParams
           });
-          
+
           // Reset selected prompt after navigation
           setSelectedPrompt(null);
-          
+
           // Track successful navigation
           analytics.trackNavigation('reframe', {
-            metadata: { 
+            metadata: {
               fromScreen: 'workshop',
               hasAudioUri: true,
               hasSelectedPrompt: !!selectedPrompt,

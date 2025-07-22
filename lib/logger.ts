@@ -224,8 +224,15 @@ class Logger {
    */
   private async sendToAnalyticsProviders(event: AnalyticsEvent): Promise<void> {
     // NOTE: Analytics events should be sent via AnalyticsService, which has access to the PostHog instance via usePostHog().
-    // This method is a no-op to avoid context issues. See lib/analytics.ts for correct usage.
-    this.warn('sendToAnalyticsProviders should not be called directly from logger. Use AnalyticsService static methods instead.', { event });
+    // This method is intentionally a no-op. We log a dev-mode warning directly to avoid recursive calls through warn ➜ trackEvent ➜ sendToAnalyticsProviders.
+    if (__DEV__) {
+      console.warn(
+        'sendToAnalyticsProviders called directly from Logger. In development this is a no-op.',
+        JSON.stringify(event, null, 2)
+      );
+    }
+    // early return – in production this will silently do nothing
+    return;
   }
 
   /**

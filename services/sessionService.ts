@@ -91,7 +91,10 @@ export class SessionService {
           audio_url: sessionData.audio_url,
           mood_before: sessionData.mood_before,
           mood_after: sessionData.mood_after,
-          session_duration_seconds: sessionData.session_duration_seconds,
+          // Ensure duration is an integer to satisfy Postgres integer column
+          session_duration_seconds: sessionData.session_duration_seconds !== undefined && sessionData.session_duration_seconds !== null
+            ? Math.round(Number(sessionData.session_duration_seconds))
+            : null,
           transformations_applied: sessionData.transformations_applied,
         })
         .select()

@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { toLocalDateKey } from '@/lib/dateUtils';
 
 /**
  * Interface for daily session data used in weekly charts
@@ -70,9 +71,7 @@ export class DashboardService {
 
       // Group sessions by date (YYYY-MM-DD format)
       const sessionDates = new Set(
-        sessions.map(session => 
-          new Date(session.created_at).toISOString().split('T')[0]
-        )
+        sessions.map(session => toLocalDateKey(session.created_at))
       );
 
       // Calculate consecutive days starting from today
@@ -82,7 +81,7 @@ export class DashboardService {
       for (let i = 0; i < 365; i++) { // Max 365 days to prevent infinite loops
         const checkDate = new Date(today);
         checkDate.setDate(today.getDate() - i);
-        const dateString = checkDate.toISOString().split('T')[0];
+        const dateString = toLocalDateKey(checkDate);
         
         if (sessionDates.has(dateString)) {
           streak++;
@@ -263,13 +262,13 @@ export class DashboardService {
           day,
           sessions: 0,
           duration: 0,
-          date: date.toISOString().split('T')[0]
+          date: toLocalDateKey(date)
         };
       });
 
       // Aggregate session data by day
       sessions?.forEach(session => {
-        const sessionDate = new Date(session.created_at).toISOString().split('T')[0];
+        const sessionDate = toLocalDateKey(session.created_at);
         const dayData = weeklyData.find(d => d.date === sessionDate);
         
         if (dayData) {

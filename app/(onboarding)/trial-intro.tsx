@@ -162,7 +162,7 @@ export default function TrialIntroScreen() {
         <View style={styles.testimonialCard}>
           <Text style={styles.stars}>★★★★★</Text>
           <Text style={styles.testimonialText}>
-            like a pressure valve for my day. i just talk, no filter, and somehow i feel 10 pounds lighter every time.
+            The one thing I need to do every day to do everything else I need to do.
           </Text>
           <Text style={styles.testimonialAuthor}>Julian</Text>
         </View>

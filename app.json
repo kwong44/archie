@@ -14,7 +14,7 @@
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.archie.app",
       "icon": "./assets/images/AppIcons/Assets.xcassets/AppIcon.appiconset/1024.png",
       "splash": {

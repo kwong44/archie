@@ -234,11 +234,11 @@ export default function OnboardingScreen() {
           <View style={styles.termsContainer}>
             <Text style={styles.termsText}>
               By tapping continue, you agree to our{' '}
-              <Text style={styles.linkText} onPress={() => openLink('https://example.com/terms')}>
+              <Text style={styles.linkText} onPress={() => openLink('https://github.com/kwong44/Archie-support/Terms-Of-Service')}>
                 Terms
               </Text>
               {' and '}
-              <Text style={styles.linkText} onPress={() => openLink('https://example.com/privacy')}>
+              <Text style={styles.linkText} onPress={() => openLink('https://kwong44.github.io/Archie-support/Privacy-Policy')}>
                 Privacy Policy
               </Text>
             </Text>

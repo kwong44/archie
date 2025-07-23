@@ -10,12 +10,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, ArrowRight } from 'lucide-react-native';
 import { createContextLogger } from '@/lib/logger';
 import { LexiconService, WordPair } from '@/services/lexiconService';
-import { StyleSheet } from 'react-native';
 
 // Create context-specific logger for the modal
 const modalLogger = createContextLogger('AddWordPairModal');
@@ -393,32 +393,14 @@ export const AddWordPairModal: React.FC<AddWordPairModalProps> = ({
               </View>
             </View>
 
-            {/* Actions */}
-            <View style={styles.actions}>
-              {/* Delete Button - Only shown in edit mode */}
-              {isEditMode && (
-                <TouchableOpacity
-                  style={[styles.button, styles.deleteButton]}
-                  onPress={handleDelete}
-                  disabled={loading}
-                >
-                  <Text style={styles.deleteButtonText}>Delete</Text>
-                </TouchableOpacity>
-              )}
-
-              <TouchableOpacity
-                style={[styles.button, styles.secondaryButton]}
-                onPress={handleClose}
-                disabled={loading}
-              >
-                <Text style={styles.secondaryButtonText}>Cancel</Text>
-              </TouchableOpacity>
-
+            {/* Actions - Vertically stacked: Save, Cancel, Delete (text) */}
+            <View style={styles.actionsVertical}>
+              {/* Save Button (Primary) */}
               <TouchableOpacity
                 style={[
                   styles.button,
                   styles.primaryButton,
-                  loading && styles.buttonDisabled
+                  loading && styles.buttonDisabled,
                 ]}
                 onPress={handleSubmit}
                 disabled={loading || !oldWord.trim() || !newWord.trim()}
@@ -429,6 +411,26 @@ export const AddWordPairModal: React.FC<AddWordPairModalProps> = ({
                   <Text style={styles.primaryButtonText}>{isEditMode ? 'Save' : 'Add Word Pair'}</Text>
                 )}
               </TouchableOpacity>
+
+              {/* Cancel Button (Secondary) */}
+              <TouchableOpacity
+                style={[styles.button, styles.secondaryButton]}
+                onPress={handleClose}
+                disabled={loading}
+              >
+                <Text style={styles.secondaryButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              {/* Delete Button - Only shown in edit mode, now a plain red text button */}
+              {isEditMode && (
+                <TouchableOpacity
+                  style={styles.deleteTextButton}
+                  onPress={handleDelete}
+                  disabled={loading}
+                >
+                  <Text style={styles.deleteTextButtonText}>Delete</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -527,10 +529,20 @@ const styles = StyleSheet.create({
     marginVertical: 16,
   },
   actions: {
+    // Old horizontal layout (kept for reference)
     flexDirection: 'row',
     paddingHorizontal: 20,
     paddingBottom: 20,
     gap: 12,
+  },
+  /**
+   * New vertical actions layout for stacked buttons
+   */
+  actionsVertical: {
+    flexDirection: 'column',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    gap: 12, // vertical gap between buttons
   },
   button: {
     flex: 1,
@@ -570,5 +582,24 @@ const styles = StyleSheet.create({
     fontWeight: '600', // Inter-SemiBold
     color: '#F5F5F0', // text-primary
     fontFamily: 'Inter-SemiBold',
+  },
+  /**
+   * Delete button as plain red text (no background, no border)
+   */
+  deleteTextButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 12,
+    width: '100%',
+  },
+  deleteTextButtonText: {
+    fontSize: 16,
+    fontWeight: '600', // Inter-SemiBold
+    color: '#E53E3E', // utility-error (red)
+    fontFamily: 'Inter-SemiBold',
+    textAlign: 'center',
   },
 }); 

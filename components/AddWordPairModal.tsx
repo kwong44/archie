@@ -32,6 +32,10 @@ interface AddWordPairModalProps {
    */
   onWordPairUpdated?: (wordPair: WordPair) => void;
   /**
+   * Callback fired when an existing word pair is deleted (edit mode)
+   */
+  onWordPairDeleted?: (wordPairId: string) => void;
+  /**
    * The authenticated user ID – required for Supabase writes
    */
   userId: string;
@@ -51,6 +55,7 @@ export const AddWordPairModal: React.FC<AddWordPairModalProps> = ({
   onClose,
   onWordPairAdded,
   onWordPairUpdated,
+  onWordPairDeleted,
   userId,
   existingWordPair,
 }) => {
@@ -225,6 +230,74 @@ export const AddWordPairModal: React.FC<AddWordPairModalProps> = ({
     }
   };
 
+  /**
+   * Handles deletion of the word pair with confirmation dialog
+   * Only available in edit mode when existingWordPair is provided
+   */
+  const handleDelete = async (): Promise<void> => {
+    if (!isEditMode || !existingWordPair) {
+      modalLogger.warn('Delete attempted outside of edit mode');
+      return;
+    }
+
+    modalLogger.info('User requested word pair deletion', {
+      userId,
+      wordPairId: existingWordPair.id,
+      transformation: `${existingWordPair.old_word} → ${existingWordPair.new_word}`,
+    });
+
+    // Show confirmation dialog
+    Alert.alert(
+      'Delete Word Pair',
+      `Are you sure you want to delete "${existingWordPair.old_word} → ${existingWordPair.new_word}"?\n\nThis action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setLoading(true);
+
+            try {
+              await LexiconService.deleteWordPair(userId, existingWordPair.id);
+
+              modalLogger.info('Word pair deleted successfully', {
+                wordPairId: existingWordPair.id,
+              });
+
+              // Notify parent component
+              onWordPairDeleted?.(existingWordPair.id);
+
+              Alert.alert(
+                'Word Pair Deleted',
+                'The word pair has been removed from your lexicon.',
+                [{ text: 'OK' }]
+              );
+
+              // Close modal
+              handleClose();
+
+            } catch (error) {
+              modalLogger.error('Failed to delete word pair', {
+                userId,
+                wordPairId: existingWordPair.id,
+                error: error instanceof Error ? error.message : 'Unknown error',
+              });
+
+              Alert.alert(
+                'Error Deleting Word Pair',
+                error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.',
+                [{ text: 'OK' }]
+              );
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <Modal
       visible={visible}
@@ -322,6 +395,17 @@ export const AddWordPairModal: React.FC<AddWordPairModalProps> = ({
 
             {/* Actions */}
             <View style={styles.actions}>
+              {/* Delete Button - Only shown in edit mode */}
+              {isEditMode && (
+                <TouchableOpacity
+                  style={[styles.button, styles.deleteButton]}
+                  onPress={handleDelete}
+                  disabled={loading}
+                >
+                  <Text style={styles.deleteButtonText}>Delete</Text>
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity
                 style={[styles.button, styles.secondaryButton]}
                 onPress={handleClose}
@@ -342,7 +426,7 @@ export const AddWordPairModal: React.FC<AddWordPairModalProps> = ({
                 {loading ? (
                   <ActivityIndicator color="#121820" size="small" />
                 ) : (
-                  <Text style={styles.primaryButtonText}>{isEditMode ? 'Save Changes' : 'Add Word Pair'}</Text>
+                  <Text style={styles.primaryButtonText}>{isEditMode ? 'Save' : 'Add Word Pair'}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -473,6 +557,15 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
   },
   secondaryButtonText: {
+    fontSize: 16,
+    fontWeight: '600', // Inter-SemiBold
+    color: '#F5F5F0', // text-primary
+    fontFamily: 'Inter-SemiBold',
+  },
+  deleteButton: {
+    backgroundColor: '#E53E3E', // utility-error
+  },
+  deleteButtonText: {
     fontSize: 16,
     fontWeight: '600', // Inter-SemiBold
     color: '#F5F5F0', // text-primary

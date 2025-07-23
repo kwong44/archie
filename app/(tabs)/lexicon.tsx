@@ -171,6 +171,30 @@ export default function LexiconScreen() {
   };
 
   /**
+   * Callback fired by the modal when a word pair is deleted successfully.
+   * We remove the deleted pair from local state and refresh stats.
+   */
+  const handleWordPairDeleted = (deletedWordPairId: string) => {
+    lexiconLogger.info('Word pair deleted – updating local state', {
+      wordPairId: deletedWordPairId,
+    });
+
+    // Remove the deleted pair from the list
+    setWordPairs(prev => prev.filter(p => p.id !== deletedWordPairId));
+
+    // Refresh stats asynchronously (non-blocking UI)
+    if (session?.user) {
+      LexiconService.getLexiconStats(session.user.id)
+        .then(setStats)
+        .catch(error =>
+          lexiconLogger.error('Failed to refresh stats after deletion', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+          }),
+        );
+    }
+  };
+
+  /**
    * Handles successful word pair addition
    * Updates local state and refreshes data
    */
@@ -391,6 +415,7 @@ export default function LexiconScreen() {
           userId={session.user.id}
           existingWordPair={wordPairBeingEdited}
           onWordPairUpdated={handleWordPairUpdated}
+          onWordPairDeleted={handleWordPairDeleted}
         />
       )}
     </SafeAreaView>

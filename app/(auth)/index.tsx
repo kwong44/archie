@@ -6,7 +6,8 @@ import {
   StyleSheet, 
   ActivityIndicator,
   Alert,
-  Linking
+  Linking,
+  Platform
 } from 'react-native';
 import { useRouter, Redirect } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
@@ -116,7 +117,21 @@ export default function OnboardingScreen() {
   async function signUpWithApple() {
     logger.info('Initiating Apple OAuth sign-up from onboarding');
     setAppleLoading(true);
+    
     try {
+      // Check if Apple Authentication is available on this device
+      const isAvailable = await AppleAuthentication.isAvailableAsync();
+      if (!isAvailable) {
+        logger.warn('Apple Authentication not available on this device');
+        Alert.alert(
+          'Apple Sign-In Unavailable', 
+          'Apple Sign-In is not available on this device. Please use Google or email sign-up instead.'
+        );
+        return;
+      }
+
+      logger.info('Apple Authentication is available, proceeding with sign-in');
+      
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
@@ -152,6 +167,13 @@ export default function OnboardingScreen() {
       if (e.code === 'ERR_REQUEST_CANCELED') {
         // Handle user canceling the sign-in flow
         logger.info('User canceled Apple Sign-Up.');
+      } else if (e.code === 'ERR_REQUEST_UNKNOWN') {
+        // Handle unknown request errors (often configuration issues)
+        logger.error('Apple Authentication request failed with unknown error', { error: e });
+        Alert.alert(
+          'Apple Sign-In Error', 
+          'Unable to connect to Apple Sign-In service. Please try again or use another sign-up method.'
+        );
       } else {
         Alert.alert('Error', 'An unexpected error occurred. Please try again.');
         logger.error('Apple Sign-Up error:', { error: e });
@@ -207,17 +229,19 @@ export default function OnboardingScreen() {
               )}
             </TouchableOpacity>
 
-            {/* Apple Sign Up Button */}
-            {appleLoading ? (
-              <ActivityIndicator color="#FFFFFF" style={styles.appleButton} />
-            ) : (
-              <AppleAuthentication.AppleAuthenticationButton
-                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
-                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
-                cornerRadius={12}
-                style={styles.appleButton}
-                onPress={signUpWithApple}
-              />
+            {/* Apple Sign Up Button - Only show on iOS */}
+            {Platform.OS === 'ios' && (
+              appleLoading ? (
+                <ActivityIndicator color="#FFFFFF" style={styles.appleButton} />
+              ) : (
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                  buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+                  cornerRadius={12}
+                  style={styles.appleButton}
+                  onPress={signUpWithApple}
+                />
+              )
             )}
 
             {/* Email Sign Up - Less Prominent */}

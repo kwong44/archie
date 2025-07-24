@@ -8,7 +8,8 @@ import {
   TouchableOpacity, 
   ActivityIndicator, 
   TouchableWithoutFeedback,
-  Keyboard 
+  Keyboard,
+  Platform
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useRouter } from 'expo-router';
@@ -141,7 +142,21 @@ export default function LoginScreen() {
   async function signInWithApple() {
     logger.info('Initiating Apple OAuth sign-in');
     setAppleLoading(true);
+    
     try {
+      // Check if Apple Authentication is available on this device
+      const isAvailable = await AppleAuthentication.isAvailableAsync();
+      if (!isAvailable) {
+        logger.warn('Apple Authentication not available on this device');
+        Alert.alert(
+          'Apple Sign-In Unavailable', 
+          'Apple Sign-In is not available on this device. Please use Google or email sign-in instead.'
+        );
+        return;
+      }
+
+      logger.info('Apple Authentication is available, proceeding with sign-in');
+      
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
@@ -173,6 +188,13 @@ export default function LoginScreen() {
       if (e.code === 'ERR_REQUEST_CANCELED') {
         // Handle user canceling the sign-in flow
         logger.info('User canceled Apple Sign-In.');
+      } else if (e.code === 'ERR_REQUEST_UNKNOWN') {
+        // Handle unknown request errors (often configuration issues)
+        logger.error('Apple Authentication request failed with unknown error', { error: e });
+        Alert.alert(
+          'Apple Sign-In Error', 
+          'Unable to connect to Apple Sign-In service. Please try again or use another sign-in method.'
+        );
       } else {
         Alert.alert('Error', 'An unexpected error occurred. Please try again.');
         logger.error('Apple Sign-In error:', { error: e });
@@ -260,17 +282,19 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
-          {/* Apple Sign In Button */}
-          {appleLoading ? (
-             <ActivityIndicator color="#FFFFFF" style={styles.appleButton} />
-          ) : (
-            <AppleAuthentication.AppleAuthenticationButton
-              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
-              cornerRadius={12}
-              style={styles.appleButton}
-              onPress={signInWithApple}
-            />
+          {/* Apple Sign In Button - Only show on iOS */}
+          {Platform.OS === 'ios' && (
+            appleLoading ? (
+               <ActivityIndicator color="#FFFFFF" style={styles.appleButton} />
+            ) : (
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+                cornerRadius={12}
+                style={styles.appleButton}
+                onPress={signInWithApple}
+              />
+            )
           )}
 
           {/* Navigate to Sign Up */}

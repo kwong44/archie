@@ -41,3 +41,9 @@ archie-ai-backend/google-credentials.json
 
 # marketing assets
 marketing-assets/
+
+# security - JWT and Apple client secrets
+*-client-secret-*.txt
+apple-client-secret-*.txt
+*.jwt
+jwt-*.txt

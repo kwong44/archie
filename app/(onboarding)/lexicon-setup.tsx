@@ -28,75 +28,81 @@ interface WordPair {
 const SAMPLE_WORD_PAIRS: WordPair[] = [
   {
     id: '1',
-    oldWord: 'anxious',
-    newWord: 'excited',
-    description: 'Transform nervous energy into anticipation'
+    oldWord: 'should',
+    newWord: 'choose to',
+    description: 'Transform obligation into choice. Take back my sovereignty.'
   },
   {
     id: '2',
-    oldWord: 'stressed',
-    newWord: 'energized',
-    description: 'Reframe pressure as motivation'
+    oldWord: 'depressed',
+    newWord: 'integrating wisdom',
+    description: 'Trust the depth of my transformational process'
   },
   {
     id: '3',
-    oldWord: 'overwhelmed',
-    newWord: 'full of opportunities',
-    description: 'See abundance instead of burden'
+    oldWord: 'moody',
+    newWord: 'emotionally responsive',
+    description: 'Honor my natural emotional intelligence system'
   },
   {
     id: '4',
-    oldWord: 'tired',
-    newWord: 'recharging',
-    description: 'Honor your need for restoration'
+    oldWord: 'triggered',
+    newWord: 'activated',
+    description: 'Transform emotional reactivity into conscious awakening'
   },
   {
     id: '5',
-    oldWord: 'confused',
-    newWord: 'exploring',
-    description: 'Embrace uncertainty as discovery'
+    oldWord: 'procrastinating',
+    newWord: 'prioritizing',
+    description: 'Recognize my brain\'s natural filtering system at work'
   },
   {
     id: '6',
-    oldWord: 'failed',
-    newWord: 'learned',
-    description: 'Turn setbacks into growth'
+    oldWord: 'lonely',
+    newWord: 'communing with self',
+    description: 'Reframe solitude as sacred inner connection'
   },
   {
     id: '7',
-    oldWord: 'stuck',
-    newWord: 'preparing',
-    description: 'Trust the process of change'
+    oldWord: 'perfectionist',
+    newWord: 'devoted to excellence',
+    description: 'Channel high standards into loving craftsmanship'
   },
   {
     id: '8',
-    oldWord: 'difficult',
-    newWord: 'challenging',
-    description: 'Embrace growth opportunities'
+    oldWord: 'rejected',
+    newWord: 'redirected',
+    description: 'Trust the universe\'s guidance toward your true path'
   },
   {
     id: '9',
+    oldWord: 'failing',
+    newWord: 'learning and growing as a person',
+    description: 'Embrace growth opportunities'
+  },
+  {
+    id: '10',
     oldWord: 'worried',
     newWord: 'preparing',
     description: 'Channel concern into proactive planning'
   },
   {
-    id: '10',
-    oldWord: 'impossible',
-    newWord: 'unprecedented',
-    description: 'Transform barriers into breakthrough opportunities'
+    id: '11',
+    oldWord: 'angry',
+    newWord: 'passionate for change',
+    description: 'Channel righteous energy into transformative action'
   },
   {
-    id: '11',
+    id: '12',
     oldWord: 'lost',
     newWord: 'discovering',
     description: 'Trust the journey of self-exploration'
   },
   {
-    id: '12',
-    oldWord: 'broken',
-    newWord: 'rebuilding',
-    description: 'Honor the strength found in reconstruction'
+    id: '13',
+    oldWord: 'jealous',
+    newWord: 'inspired by possibility',
+    description: 'Transform envy into motivation for your own growth'
   }
   
 ];

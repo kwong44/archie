@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "archie",
+    "name": "Archie",
     "slug": "archie-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -69,7 +69,8 @@
         }
       ],
       "expo-localization",
-      "expo-updates"
+      "expo-updates",
+      "expo-apple-authentication"
     ],
     "updates": {
       "url": "https://u.expo.dev/2fa5ea09-ee3b-4740-be0a-56e083256c37"

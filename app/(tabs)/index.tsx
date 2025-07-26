@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Mic, MicOff } from 'lucide-react-native';
+import { Mic, MicOff, Pause, Play } from 'lucide-react-native';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -23,7 +23,10 @@ import { UserService } from '@/services/userService';
 const { width, height } = Dimensions.get('window');
 
 export default function WorkshopScreen() {
-  const [isRecording, setIsRecording] = useState(false);
+  // Recording state management
+  type RecordingState = 'stopped' | 'recording' | 'paused';
+  const [recordingState, setRecordingState] = useState<RecordingState>('stopped');
+  
   const [hasPermission, setHasPermission] = useState(false);
   const [userName, setUserName] = useState('Creator'); // Real user name from database
   const [loadingUserName, setLoadingUserName] = useState(true); // Loading state for user name
@@ -210,7 +213,7 @@ export default function WorkshopScreen() {
     });
 
     // Auto-start recording with the selected prompt context
-    if (!isRecording) {
+    if (recordingState === 'stopped') {
       await startRecording();
     }
   };
@@ -373,7 +376,7 @@ export default function WorkshopScreen() {
         Audio.RecordingOptionsPresets.HIGH_QUALITY
       );
       recording.current = newRecording;
-      setIsRecording(true);
+      setRecordingState('recording');
 
       // Track recording start with prompt context
       const recordingPrompt = selectedPrompt ? selectedPrompt.prompt : currentPrompt;
@@ -409,6 +412,68 @@ export default function WorkshopScreen() {
   };
 
   /**
+   * Pauses the current recording
+   * Keeps the same recording file but stops the timer
+   */
+  const pauseRecording = async () => {
+    if (!recording.current || recordingState !== 'recording') return;
+
+    try {
+      await recording.current.pauseAsync();
+      setRecordingState('paused');
+
+      logger.info('Recording paused', {
+        hadSelectedPrompt: !!selectedPrompt,
+        promptId: selectedPrompt?.id
+      });
+
+      // Track pause event
+      analytics.trackEngagement('session_extended', {
+        metadata: {
+          hadSelectedPrompt: !!selectedPrompt,
+          promptId: selectedPrompt?.id,
+          action: 'paused'
+        }
+      });
+
+    } catch (err) {
+      logger.error('Failed to pause recording', { error: err });
+      console.error('Failed to pause recording', err);
+    }
+  };
+
+  /**
+   * Resumes the current recording
+   * Continues the same recording file
+   */
+  const resumeRecording = async () => {
+    if (!recording.current || recordingState !== 'paused') return;
+
+    try {
+      await recording.current.startAsync();
+      setRecordingState('recording');
+
+      logger.info('Recording resumed', {
+        hadSelectedPrompt: !!selectedPrompt,
+        promptId: selectedPrompt?.id
+      });
+
+      // Track resume event
+      analytics.trackEngagement('session_extended', {
+        metadata: {
+          hadSelectedPrompt: !!selectedPrompt,
+          promptId: selectedPrompt?.id,
+          action: 'resumed'
+        }
+      });
+
+    } catch (err) {
+      logger.error('Failed to resume recording', { error: err });
+      console.error('Failed to resume recording', err);
+    }
+  };
+
+  /**
    * Cancels the current recording without processing or navigation
    * Used when user explicitly cancels the recording
    */
@@ -423,7 +488,7 @@ export default function WorkshopScreen() {
 
       await recording.current.stopAndUnloadAsync();
       recording.current = null;
-      setIsRecording(false);
+      setRecordingState('stopped');
 
       // Reset the start time
       recordingStartTime.current = null;
@@ -476,7 +541,7 @@ export default function WorkshopScreen() {
       await recording.current.stopAndUnloadAsync();
       const uri = recording.current.getURI();
       recording.current = null;
-      setIsRecording(false);
+      setRecordingState('stopped');
 
       // Reset the start time
       recordingStartTime.current = null;
@@ -580,7 +645,7 @@ export default function WorkshopScreen() {
   };
 
   const toggleRecording = () => {
-    if (isRecording) {
+    if (recordingState === 'recording' || recordingState === 'paused') {
       stopRecording();
     } else {
       startRecording();
@@ -640,7 +705,7 @@ export default function WorkshopScreen() {
               onPress={toggleRecording}
               activeOpacity={0.8}
             >
-              {isRecording ? (
+              {recordingState === 'recording' || recordingState === 'paused' ? (
                 <MicOff color="#121820" size={36} strokeWidth={2} />
               ) : (
                 <Mic color="#121820" size={36} strokeWidth={2} />
@@ -649,23 +714,37 @@ export default function WorkshopScreen() {
           </Animated.View>
         </View>
 
-        {isRecording && (
+        {(recordingState === 'recording' || recordingState === 'paused') && (
           <View style={styles.recordingControls}>
             <View style={styles.recordingIndicator}>
               <View style={styles.recordingDot} />
-              <Text style={styles.recordingText}>Listening...</Text>
+              <Text style={styles.recordingText}>
+                {recordingState === 'recording' ? 'Listening...' : 'Paused'}
+              </Text>
             </View>
-            <TouchableOpacity 
-              style={styles.cancelButton}
-              onPress={cancelRecording}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
+            <View style={styles.recordingButtons}>
+              <TouchableOpacity 
+                style={styles.pausePlayButton}
+                onPress={recordingState === 'recording' ? pauseRecording : resumeRecording}
+              >
+                {recordingState === 'recording' ? (
+                  <Pause color="#FFFFFF" size={24} strokeWidth={2} />
+                ) : (
+                  <Play color="#FFFFFF" size={24} strokeWidth={2} />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.cancelButton}
+                onPress={cancelRecording}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
         {/* Suggested Reflections Section - Collapsible */}
-        {!isRecording && !selectedPrompt && journalPrompts.length > 0 && (
+        {recordingState === 'stopped' && !selectedPrompt && journalPrompts.length > 0 && (
           <View
             style={styles.promptsSection}
             onLayout={(e) => {
@@ -807,6 +886,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 195, 0, 0.3)',
     marginBottom: 12,
+  },
+  recordingButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  pausePlayButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(156, 163, 175, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(156, 163, 175, 0.3)',
   },
   recordingDot: {
     width: 8,

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Sparkles, RefreshCw, Mic } from 'lucide-react-native';
+import { ArrowLeft, RefreshCw, Mic } from 'lucide-react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useAuth } from '@/context/AuthContext';
 import { LexiconService, WordPair } from '@/services/lexiconService';
@@ -575,7 +575,6 @@ export default function ReframeScreen() {
         {/* The Guide's Summary */}
         <View style={styles.summaryContainer}>
           <View style={styles.summaryHeader}>
-            <Sparkles color="#FFC300" size={20} strokeWidth={2} />
             <Text style={styles.summaryTitle}>The Guide's Reflection</Text>
           </View>
           <View style={styles.summaryBox}>

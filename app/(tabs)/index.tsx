@@ -408,6 +408,62 @@ export default function WorkshopScreen() {
     }
   };
 
+  /**
+   * Cancels the current recording without processing or navigation
+   * Used when user explicitly cancels the recording
+   */
+  const cancelRecording = async () => {
+    if (!recording.current) return;
+
+    try {
+      // Calculate duration for logging purposes only
+      const durationSeconds = recordingStartTime.current
+        ? parseFloat(((Date.now() - recordingStartTime.current) / 1000).toFixed(2))
+        : 0;
+
+      await recording.current.stopAndUnloadAsync();
+      recording.current = null;
+      setIsRecording(false);
+
+      // Reset the start time
+      recordingStartTime.current = null;
+
+      // Track recording cancellation
+      analytics.trackEngagement('session_extended', {
+        metadata: {
+          durationSeconds: String(durationSeconds),
+          hadSelectedPrompt: !!selectedPrompt,
+          promptId: selectedPrompt?.id,
+          action: 'cancelled'
+        }
+      });
+
+      logger.info('Recording cancelled', {
+        durationSeconds: durationSeconds,
+        hadSelectedPrompt: !!selectedPrompt,
+        promptId: selectedPrompt?.id
+      });
+
+      // Animate back to normal state
+      backgroundOpacity.value = withTiming(1, { duration: 500 });
+      pulseScale.value = withRepeat(
+        withSequence(
+          withTiming(1.05, { duration: 2000 }),
+          withTiming(1, { duration: 2000 })
+        ),
+        -1,
+        false
+      );
+
+      // Reset selected prompt state
+      setSelectedPrompt(null);
+
+    } catch (err) {
+      logger.error('Failed to cancel recording', { error: err });
+      console.error('Failed to cancel recording', err);
+    }
+  };
+
   const stopRecording = async () => {
     if (!recording.current) return;
 
@@ -585,9 +641,9 @@ export default function WorkshopScreen() {
               activeOpacity={0.8}
             >
               {isRecording ? (
-                <MicOff color="#121820" size={48} strokeWidth={2} />
+                <MicOff color="#121820" size={36} strokeWidth={2} />
               ) : (
-                <Mic color="#121820" size={48} strokeWidth={2} />
+                <Mic color="#121820" size={36} strokeWidth={2} />
               )}
             </TouchableOpacity>
           </Animated.View>
@@ -599,20 +655,12 @@ export default function WorkshopScreen() {
               <View style={styles.recordingDot} />
               <Text style={styles.recordingText}>Listening...</Text>
             </View>
-            {selectedPrompt && (
-              <TouchableOpacity 
-                style={styles.cancelButton}
-                onPress={() => {
-                  stopRecording();
-                  setSelectedPrompt(null);
-                  logger.info('User cancelled recording with selected prompt', {
-                    promptId: selectedPrompt.id
-                  });
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity 
+              style={styles.cancelButton}
+              onPress={cancelRecording}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
           </View>
         )}
 

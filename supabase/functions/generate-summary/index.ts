@@ -160,6 +160,15 @@ A user has just shared a stream-of-consciousness entry capturing their current I
 """
 ${request.original_text}
 """${principlesContext}
+A user just completed a reframing session where they examined their internal dialogue and consciously chose more empowering language.
+
+**IMPORTANT: The transcription may contain non-speech sounds in parentheses (e.g., (laughter), (background noise)). You MUST ignore these parenthetical phrases completely in your analysis and output.**
+
+ORIGINAL THOUGHTS:
+"${request.original_text}"
+
+REFRAMED THOUGHTS:
+"${request.reframed_text}"${transformationsContext}${principlesContext}
 
 Your mission is to craft TWO outputs:
 

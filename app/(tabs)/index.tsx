@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform, ScrollView, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Mic, MicOff, Pause, Play } from 'lucide-react-native';
 import Animated, { 
@@ -28,6 +28,7 @@ export default function WorkshopScreen() {
   const [recordingState, setRecordingState] = useState<RecordingState>('stopped');
   
   const [hasPermission, setHasPermission] = useState(false);
+  const [isProcessingRecording, setIsProcessingRecording] = useState(false); // NEW: Loading state for recording
   const [userName, setUserName] = useState('Creator'); // Real user name from database
   const [loadingUserName, setLoadingUserName] = useState(true); // Loading state for user name
   const [journalPrompts, setJournalPrompts] = useState<JournalPrompt[]>([]);
@@ -61,12 +62,8 @@ export default function WorkshopScreen() {
   // ScrollView reference to control programmatic scrolling
   const scrollViewRef = useRef<ScrollView | null>(null);
 
-  // Y-position of the prompts section within the ScrollView
+  // Y-position of the prompts section for manual scroll (simplified)
   const [promptsSectionY, setPromptsSectionY] = useState(0);
-  // Indicates that the view has reached prompts area; used to detect upward scroll away
-  const [hasReachedPrompts, setHasReachedPrompts] = useState(false);
-  const collapseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [collapseScheduled, setCollapseScheduled] = useState(false);
 
   useEffect(() => {
     // Track screen view for analytics
@@ -139,32 +136,53 @@ export default function WorkshopScreen() {
           setCurrentUserId(session.user.id);
           logger.info('Current user loaded', { userId: session.user.id });
           
-          // Fetch personalized prompts for the user
-          const personalizedPrompts = await PromptService.getPersonalizedPrompts(session.user.id, 3);
-          setJournalPrompts(personalizedPrompts);
-          
-          logger.info('Personalized prompts loaded', { 
-            userId: session.user.id,
-            promptCount: personalizedPrompts.length,
-            categories: personalizedPrompts.map(p => p.category)
-          });
-          
-          // Track prompt loading analytics - moved outside of dependency array
-          analytics.trackEngagement('prompt_viewed', {
-            feature: 'intelligent_prompts',
-            metadata: {
+          // Fetch personalized prompts for the user with error handling
+          try {
+            const personalizedPrompts = await PromptService.getPersonalizedPrompts(session.user.id, 3);
+            setJournalPrompts(personalizedPrompts);
+            
+            logger.info('Personalized prompts loaded', { 
+              userId: session.user.id,
               promptCount: personalizedPrompts.length,
-              categories: personalizedPrompts.map(p => p.category),
-              hasPersonalized: personalizedPrompts.some(p => p.isPersonalized)
-            }
-          });
+              categories: personalizedPrompts.map(p => p.category)
+            });
+            
+            // Track prompt loading analytics
+            analytics.trackEngagement('prompt_viewed', {
+              feature: 'intelligent_prompts',
+              metadata: {
+                promptCount: personalizedPrompts.length,
+                categories: personalizedPrompts.map(p => p.category),
+                hasPersonalized: personalizedPrompts.some(p => p.isPersonalized)
+              }
+            });
+          } catch (promptError) {
+            logger.error('Failed to load personalized prompts, using fallback', { 
+              userId: session.user.id, 
+              error: promptError 
+            });
+            
+            // Use fallback prompts if personalization fails
+            const fallbackPrompts = await PromptService.getPersonalizedPrompts('fallback_user', 2);
+            setJournalPrompts(fallbackPrompts);
+            
+            analytics.trackError('personalized_prompts_failed', 'workshop', {
+              metadata: { userId: session.user.id }
+            });
+          }
         }
       } catch (error) {
-        logger.error('Failed to load prompts', { error });
+        logger.error('Failed to load user and prompts', { error });
         
-        // Show fallback prompts if personalization fails
-        const fallbackPrompts = await PromptService.getPersonalizedPrompts('fallback_user', 2);
-        setJournalPrompts(fallbackPrompts);
+        // Show fallback prompts if everything fails
+        try {
+          const fallbackPrompts = await PromptService.getPersonalizedPrompts('fallback_user', 2);
+          setJournalPrompts(fallbackPrompts);
+        } catch (fallbackError) {
+          logger.error('Even fallback prompts failed', { error: fallbackError });
+          // Set empty array to prevent infinite loading
+          setJournalPrompts([]);
+        }
       } finally {
         setLoadingPrompts(false);
       }
@@ -306,64 +324,42 @@ export default function WorkshopScreen() {
         }
       }, 50);
     } else {
-      // Collapse ‑ scroll back to top and reset flag
+      // Collapse ‑ scroll back to top
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-      setHasReachedPrompts(false);
     }
   };
 
+
+
   /**
-   * Handles ScrollView scroll events.
-   * If user scrolls upward past the prompts section while it is expanded,
-   * automatically collapse the section and return to the top.
+   * Enhanced startRecording with comprehensive error handling
+   * Prevents button from becoming unresponsive on errors
    */
-  const handleScroll = useCallback(
-    (event: any) => {
-      if (!promptsExpanded) return;
-
-      const offsetY = event.nativeEvent.contentOffset.y;
-
-      // Mark that prompts area has been reached when scrolling down
-      if (!hasReachedPrompts && offsetY >= promptsSectionY - 40) {
-        setHasReachedPrompts(true);
-      }
-
-      const collapseThreshold = promptsSectionY - 150;
-
-      if (hasReachedPrompts && offsetY < collapseThreshold && !collapseScheduled) {
-        logger.info('User scrolled above prompts threshold – scheduling collapse');
-        setCollapseScheduled(true);
-
-        // Delay collapse slightly to create smoother UX
-        collapseTimeoutRef.current = setTimeout(() => {
-          logger.info('Executing prompt section collapse');
-          setPromptsExpanded(false);
-          scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-          setHasReachedPrompts(false);
-          setCollapseScheduled(false);
-        }, 300); // 300ms delay for natural feel
-      }
-
-      // If user scrolls back down before timeout, cancel collapse
-      if (collapseScheduled && offsetY >= collapseThreshold) {
-        if (collapseTimeoutRef.current) {
-          clearTimeout(collapseTimeoutRef.current);
-        }
-        setCollapseScheduled(false);
-        logger.debug('Collapse cancelled – user scrolled back into prompts');
-      }
-    },
-    [promptsExpanded, promptsSectionY, hasReachedPrompts]
-  );
-
   const startRecording = async () => {
-    if (!hasPermission) {
-      const { status } = await Audio.requestPermissionsAsync();
-      if (status !== 'granted') return;
-      setHasPermission(true);
+    logger.info('Starting recording process', { hasPermission, isProcessingRecording });
+    
+    // Prevent multiple simultaneous recording attempts
+    if (isProcessingRecording) {
+      logger.warn('Recording already in progress, ignoring duplicate request');
+      return;
     }
 
+    setIsProcessingRecording(true);
+
     try {
+      // Check and request permission if needed
+      if (!hasPermission) {
+        logger.info('No permission, requesting audio permission');
+        const { status } = await Audio.requestPermissionsAsync();
+        if (status !== 'granted') {
+          logger.warn('Permission denied, cannot start recording');
+          Alert.alert('Permission Required', 'Microphone access is needed to record your thoughts.');
+          return;
+        }
+        setHasPermission(true);
+      }
+
+      // Configure audio mode
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
@@ -390,7 +386,7 @@ export default function WorkshopScreen() {
         }
       });
       
-      logger.info('Audio recording started', { 
+      logger.info('Audio recording started successfully', { 
         prompt: recordingPrompt,
         selectedPromptId: selectedPrompt?.id,
         selectedPromptTitle: selectedPrompt?.title
@@ -406,8 +402,29 @@ export default function WorkshopScreen() {
         -1,
         false
       );
+
     } catch (err) {
-      console.error('Failed to start recording', err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      logger.error('Failed to start recording', { error: errorMessage });
+      
+      // Track the error for monitoring
+      analytics.trackError('recording_start_failed', 'workshop', {
+        metadata: { error: errorMessage, platform: Platform.OS }
+      });
+
+      // Show user-friendly error message
+      Alert.alert(
+        'Recording Error',
+        'Unable to start recording. Please check your microphone permissions and try again.',
+        [{ text: 'OK', style: 'default' }]
+      );
+
+      // Reset state on error to prevent button lockup
+      setRecordingState('stopped');
+      recording.current = null;
+      recordingStartTime.current = null;
+    } finally {
+      setIsProcessingRecording(false);
     }
   };
 
@@ -644,11 +661,22 @@ export default function WorkshopScreen() {
     }
   };
 
-  const toggleRecording = () => {
-    if (recordingState === 'recording' || recordingState === 'paused') {
-      stopRecording();
-    } else {
-      startRecording();
+  /**
+   * Enhanced toggleRecording with error handling
+   * Prevents button from becoming unresponsive if startRecording fails
+   */
+  const toggleRecording = async () => {
+    try {
+      if (recordingState === 'recording' || recordingState === 'paused') {
+        await stopRecording();
+      } else {
+        await startRecording();
+      }
+    } catch (error) {
+      logger.error('Toggle recording failed', { error });
+      // Reset state to prevent button from becoming unresponsive
+      setRecordingState('stopped');
+      setIsProcessingRecording(false);
     }
   };
 
@@ -665,14 +693,7 @@ export default function WorkshopScreen() {
     };
   });
 
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (collapseTimeoutRef.current) {
-        clearTimeout(collapseTimeoutRef.current);
-      }
-    };
-  }, []);
+  // No cleanup needed with manual control only
 
   return (
     <SafeAreaView style={styles.container}>
@@ -680,8 +701,6 @@ export default function WorkshopScreen() {
       
       <ScrollView 
         ref={scrollViewRef}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -701,11 +720,14 @@ export default function WorkshopScreen() {
         <View style={styles.orbContainer}>
           <Animated.View style={[styles.orb, orbAnimatedStyle]}>
             <TouchableOpacity
-              style={styles.orbButton}
+              style={[styles.orbButton, isProcessingRecording && styles.orbButtonDisabled]}
               onPress={toggleRecording}
               activeOpacity={0.8}
+              disabled={isProcessingRecording}
             >
-              {recordingState === 'recording' || recordingState === 'paused' ? (
+              {isProcessingRecording ? (
+                <ActivityIndicator color="#121820" size="small" />
+              ) : recordingState === 'recording' || recordingState === 'paused' ? (
                 <MicOff color="#121820" size={36} strokeWidth={2} />
               ) : (
                 <Mic color="#121820" size={36} strokeWidth={2} />
@@ -743,8 +765,8 @@ export default function WorkshopScreen() {
           </View>
         )}
 
-        {/* Suggested Reflections Section - Collapsible */}
-        {recordingState === 'stopped' && !selectedPrompt && journalPrompts.length > 0 && (
+        {/* Enhanced Suggested Reflections Section with better loading states */}
+        {recordingState === 'stopped' && !selectedPrompt && (
           <View
             style={styles.promptsSection}
             onLayout={(e) => {
@@ -753,48 +775,55 @@ export default function WorkshopScreen() {
               logger.debug('Prompts section Y set', { y });
             }}
           >
-            {!promptsExpanded ? (
-              // Collapsed State - Subtle hint
-              <TouchableOpacity 
-                style={styles.promptsCollapsed}
-                onPress={togglePromptsExpansion}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.promptsCollapsedText}>
-                  💡 Explore new topics
-                </Text>
-                <Text style={styles.promptsCollapsedIcon}>↓</Text>
-              </TouchableOpacity>
-            ) : (
-              // Expanded State - Full prompts display
-              <View>
-                <TouchableOpacity 
-                  style={styles.promptsHeader}
-                  onPress={togglePromptsExpansion}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.promptsSectionTitle}>Go Deeper</Text>
-                  <Text style={styles.promptsCollapseIcon}>↑</Text>
-                </TouchableOpacity>
-                
-                <Text style={styles.promptsSectionSubtitle}>
-                  Explore new areas of your life journey
-                </Text>
-                
-                {journalPrompts.map((prompt, index) => (
-                  <PromptCard
-                    key={prompt.id}
-                    prompt={prompt}
-                    onPromptPress={handlePromptPress}
-                    onSkip={handlePromptSkip}
-                  />
-                ))}
-                
-                {loadingPrompts && (
-                  <View style={styles.loadingContainer}>
-                    <Text style={styles.loadingText}>Loading personalized prompts...</Text>
+            {loadingPrompts ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#FFC300" />
+                <Text style={styles.loadingText}>Loading personalized prompts...</Text>
+              </View>
+            ) : journalPrompts.length > 0 ? (
+              <>
+                {!promptsExpanded ? (
+                  // Collapsed State - Subtle hint
+                  <TouchableOpacity 
+                    style={styles.promptsCollapsed}
+                    onPress={togglePromptsExpansion}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.promptsCollapsedText}>
+                      💡 Explore new topics
+                    </Text>
+                    <Text style={styles.promptsCollapsedIcon}>↓</Text>
+                  </TouchableOpacity>
+                ) : (
+                  // Expanded State - Full prompts display
+                  <View>
+                    <TouchableOpacity 
+                      style={styles.promptsHeader}
+                      onPress={togglePromptsExpansion}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.promptsSectionTitle}>Go Deeper</Text>
+                      <Text style={styles.promptsCollapseIcon}>↑</Text>
+                    </TouchableOpacity>
+                    
+                    <Text style={styles.promptsSectionSubtitle}>
+                      Explore new areas of your life journey
+                    </Text>
+                    
+                    {journalPrompts.map((prompt, index) => (
+                      <PromptCard
+                        key={prompt.id}
+                        prompt={prompt}
+                        onPromptPress={handlePromptPress}
+                        onSkip={handlePromptSkip}
+                      />
+                    ))}
                   </View>
                 )}
+              </>
+            ) : (
+              <View style={styles.loadingContainer}>
+                <Text style={styles.loadingText}>No prompts available</Text>
               </View>
             )}
           </View>
@@ -871,6 +900,9 @@ const styles = StyleSheet.create({
     borderRadius: 90,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  orbButtonDisabled: {
+    opacity: 0.6,
   },
   recordingControls: {
     alignItems: 'center',

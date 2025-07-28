@@ -159,7 +159,7 @@ export const PromptCard: React.FC<PromptCardProps> = ({
             onPress={handlePromptPress}
             activeOpacity={0.8}
           >
-            <Mic color="#121820" size={32} strokeWidth={2} />
+            <Mic color="#121820" size={24} strokeWidth={2} />
           </TouchableOpacity>
         </View>
       </View>

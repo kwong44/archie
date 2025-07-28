@@ -145,61 +145,41 @@ function validateSummaryRequest(data: any): { valid: boolean; error?: string; re
  */
 function buildGeminiPrompt(request: SummaryRequest): string {
   console.log('✨ Building Gemini prompt for summary and description', {
-    hasTransformations: request.transformation_count! > 0,
-    hasPrinciples: request.user_principles!.length > 0,
-    textChanged: request.reframed_text !== request.original_text
+    hasPrinciples: request.user_principles?.length || 0,
   });
-  
-  // Build context about transformations made
-  let transformationsContext = '';
-  if (request.transformation_count && request.transformation_count > 0) {
-    transformationsContext = `\n\nThe user made ${request.transformation_count} language transformation(s) during this session.`;
-  }
   
   // Build context about user principles
   let principlesContext = '';
   if (request.user_principles && request.user_principles.length > 0) {
     principlesContext = `\n\nUser's core principles: ${request.user_principles.join(', ')}`;
   }
-  
-  // Check if any actual reframing occurred
-  const textChanged = request.reframed_text !== request.original_text;
-  
-  const prompt = `You are The Architect's AI Guide - a wise, encouraging mentor who helps people transform their language to reshape their reality.
 
-A user just completed a reframing session where they examined their internal dialogue and consciously chose more empowering language.
+  const prompt = `You are The Architect's AI Guide — a compassionate, insightful mentor devoted to helping people reshape their reality by transforming their language.
 
-ORIGINAL THOUGHTS:
-"${request.original_text}"
+A user has just shared a stream-of-consciousness entry capturing their current INNER THOUGHTS:
+"""
+${request.original_text}
+"""${principlesContext}
 
-REFRAMED THOUGHTS:
-"${request.reframed_text}"${transformationsContext}${principlesContext}
+Your mission is to craft TWO outputs:
 
-Your task is to generate TWO outputs:
+1. SUMMARY — 5-6 vivid, engaging sentences that:
+   • Reflect the core emotional themes and language patterns you notice.
+   • Highlight at least one empowering insight or opportunity hidden in their words.
+   • Pose 1-2 thoughtful, open-ended QUESTIONS that nudge deeper self-reflection.
+   • If principles are provided, show how their reflections intersect with those principles.
+   • Use warm, contemporary language that feels like a supportive coach.
 
-1. SUMMARY: A personalized, insightful reflection (2-3 sentences) that:
-   - Acknowledges their specific journey and growth
-   - Highlights the power of their conscious language choices
-   - Encourages continued practice of self-authorship
-   - Connects their work to larger themes of personal empowerment
+2. DESCRIPTION — ONE punchy sentence (max 18 words) that captures the entry’s essence and entices the user to revisit it.
 
-2. DESCRIPTION: A short, cool, engaging description (1 short sentence) that:
-   - Captures the essence of their transformation journey
-   - Uses inspiring, modern language that would look great on an entry card
-   - Makes them want to revisit and reflect on this entry
-   - Shows the growth and insights they're creating
-
-Please respond with ONLY a JSON object in this format:
+Reply ONLY with valid JSON in this exact shape:
 {
-  "summary": "Your encouraging reflection here...",
-  "description": "Your cool, short description here..."
-}
-
-Be warm, wise, and specific to their actual experience. Focus on the mindset shift they're creating, not just generic encouragement.`;
+  "summary": "...",
+  "description": "..."
+}`;
   
-  console.log('📝 Dual-purpose prompt built successfully', {
+  console.log('📝 Prompt built successfully', {
     promptLength: prompt.length,
-    includesTransformations: transformationsContext.length > 0,
     includesPrinciples: principlesContext.length > 0
   });
   

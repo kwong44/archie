@@ -242,7 +242,7 @@ export default function ReframeScreen() {
     };
 
     generateAndSetSummary();
-  }, [transcript, reframedWords]); // Re-generate when transcript or transformations change
+  }, [transcript]); // Generate once when transcript is ready
 
   const reframeWord = (oldWord: string, newWord: string, lexiconId: string, position: number) => {
     setIsReframing(true);

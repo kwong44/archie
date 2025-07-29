@@ -167,9 +167,6 @@ A user just completed a reframing session where they examined their internal dia
 ORIGINAL THOUGHTS:
 "${request.original_text}"
 
-REFRAMED THOUGHTS:
-"${request.reframed_text}"${transformationsContext}${principlesContext}
-
 Your mission is to craft TWO outputs:
 
 1. SUMMARY — 5-6 vivid, engaging sentences that:

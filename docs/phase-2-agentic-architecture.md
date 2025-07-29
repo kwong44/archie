@@ -3,14 +3,20 @@
 ## Overview
 Transitioning from a sequential pipeline to a dynamic, agentic system where specialized agents collaborate based on the journal entry's context and content.
 
+**Primary User Stories:**
+- "As a user, I want the AI to be able to infer emotional themes from my journal entries."
+- "As a user, I want the AI to be able to infer life themes from my journal entries."
+- "As a user, I want the AI to be able to infer cognitive distortions from my journal entries."
+
+
 ## Key Components
 
 ### 1. Router Agent
 - **Purpose**: Analyze journal entry and determine which worker agents to invoke
 - **Implementation**:
-  - Fast, lightweight model (e.g., Llama 3.1 8B, Claude 3 Haiku)
+  - Fast, lightweight model (e.g., Gemini 1.5 Flash)
   - Outputs structured decision about which agents to call
-  - Considers entry content, user history, and current goals
+  - Considers entry content, user history, and current principles/goals
 
 ### 2. Worker Agents
 - **Emotional Analyst**

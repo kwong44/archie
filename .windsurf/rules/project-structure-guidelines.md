@@ -1,0 +1,94 @@
+---
+trigger: always_on
+description: 
+globs: 
+---
+## Current Project Structure
+
+.
+├── AI_BACKEND_SETUP.md
+├── EAS_UPDATE_WORKFLOW.md
+├── EDGE_FUNCTIONS_MIGRATION.md
+├── ELEVENLABS_MIGRATION_STATUS.md
+├── PROMPT_SKIP_ERROR_FIXED.md
+├── README.md
+├── SUPABASE_EMAIL_SETUP.md
+├── SUPABASE_OAUTH_FIX.md
+├── app
+│   ├── (auth)
+│   │   ├── _layout.tsx
+│   │   ├── callback.tsx
+│   │   ├── index.tsx
+│   │   ├── login.tsx
+│   │   ├── signup.tsx
+│   │   └── success.tsx
+│   ├── (onboarding)
+│   │   ├── _layout.tsx
+│   │   ├── lexicon-setup.tsx
+│   │   └── principles.tsx
+│   ├── (tabs)
+│   │   ├── _layout.tsx
+│   │   ├── dashboard.tsx
+│   │   ├── entries.tsx
+│   │   ├── index.tsx
+│   │   └── lexicon.tsx
+│   ├── +not-found.tsx
+│   ├── _layout.tsx
+│   ├── guide.tsx
+│   ├── paywall.tsx
+│   └── reframe.tsx
+├── app.json
+├── components
+│   ├── AddWordPairModal.tsx
+│   └── PromptCard.tsx
+├── context
+│   └── AuthContext.tsx
+├── docs
+│   ├── app-store-copy.md
+│   ├── database-schema.sql
+│   ├── marketing-assets-plan.md
+│   ├── phase-1.5-prd.md
+│   ├── posthog-setup.md
+│   ├── prompt_engagement_migration.sql
+│   ├── screenshot-guide.md
+│   └── social-media-templates.md
+├── eas.json
+├── email-templates
+│   └── confirmation-signup.html
+├── expo-env.d.ts
+├── hooks
+│   └── useFrameworkReady.ts
+├── lib
+│   ├── aiApiClient.ts
+│   ├── analytics.ts
+│   ├── finishOAuth.ts
+│   ├── logger.ts
+│   └── supabase.ts
+├── marketing-assets
+│   ├── README.md
+│   ├── press-kit.md
+│   └── quick-start-checklist.md
+├── package-lock.json
+├── package.json
+├── screens
+│   ├── GuideScreen.styles.ts
+│   └── GuideScreen.tsx
+├── services
+│   ├── achievementsService.ts
+│   ├── dashboardService.ts
+│   ├── insightsService.ts
+│   ├── lexiconService.ts
+│   ├── onboardingService.ts
+│   ├── promptService.ts
+│   ├── sessionService.ts
+│   ├── subscriptionService.ts
+│   └── userService.ts
+├── supabase
+│   └── functions
+├── test-assets
+│   ├── test-journal.aiff
+│   └── test-journal.m4a
+├── test-edge-functions.js
+└── tsconfig.json
+
+17 directories, 68 files

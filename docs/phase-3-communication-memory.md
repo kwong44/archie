@@ -4,7 +4,7 @@
 
 ### Context-Aware Prompt Assembly
 - **User Context Integration**
-  - Personal goals and preferences
+  - Personal principles/goals
   - Recent journal entry summaries
   - Historical patterns and themes
 

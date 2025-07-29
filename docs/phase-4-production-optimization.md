@@ -15,15 +15,15 @@
 
 ### Model Tiering
 - **Tier 1 (Router/Simple Tasks)**
-  - Fast, lightweight models (Llama 3.1 8B, Claude 3 Haiku)
+  - Fast, lightweight models (Gemini 1.5 Flash)
   - Used for: routing, basic classification
 
 - **Tier 2 (Complex Analysis)**
-  - Mid-range models (Claude 3 Sonnet)
+  - Mid-range models (Gemini 1.5)
   - Used for: emotional analysis, theme identification
 
 - **Tier 3 (Deep Reasoning)**
-  - High-performance models (GPT-4o, Claude 3 Opus)
+  - High-performance models (Gemini 2.0 Flash)
   - Used for: complex synthesis, reframing
 
 ## Asynchronous Processing

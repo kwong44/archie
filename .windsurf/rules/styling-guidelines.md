@@ -1,0 +1,1212 @@
+---
+trigger: always_on
+description: 
+globs: 
+---
+# Archie: Code Styling Guidelines
+
+---
+
+## 1. Overview
+
+This document establishes the coding standards for the Archie mobile application, based on **Airbnb's JavaScript Style Guide** with adaptations for TypeScript, React Native, and our specific tech stack. These guidelines ensure consistency, maintainability, and code quality across the entire codebase.
+
+**All code MUST follow these guidelines without exception.**
+
+---
+
+## 2. Core Principles (Airbnb + Archie Adaptations)
+
+### 2.1 Language Standards
+- **JavaScript/TypeScript**: Follow Airbnb's JavaScript Style Guide
+- **TypeScript First**: All new code MUST be TypeScript with strict type checking
+- **React Native**: Adapt web patterns for mobile-specific concerns
+- **Functional Programming**: Prefer functional components and hooks over class components
+
+### 2.2 Archie-Specific Rules
+- **No Massive Files**: Maximum 500 lines per file - refactor into smaller modules
+- **Modular Architecture**: Each component/service should have a single responsibility
+- **Comment Everything**: Use JSDoc3 for all functions, complex logic, and business rules
+- **Log Everything**: Use appropriate logging solutions for each environment:
+  - **React Native/Expo**: Use console logging with structured formats or React Native logging libraries
+  - **Node.js Backend**: Use Winston for comprehensive server-side logging
+  - **Python Backend**: Use Python's built-in logging module with JSON formatting
+
+---
+
+## 3. File Organization & Naming
+
+### 3.1 Directory Structure (Must Follow)
+```
+app/
+  (auth)/           # Authentication screens
+  (tabs)/           # Main tab navigation
+  (onboarding)/     # Onboarding flow
+lib/                # Shared utilities, clients
+context/            # React Context providers
+hooks/              # Custom React hooks
+components/         # Reusable UI components
+services/           # Business logic, API calls
+stores/             # Zustand state management
+types/              # TypeScript type definitions
+```
+
+### 3.2 File Naming Conventions
+```typescript
+// ✅ Good - PascalCase for components
+UserProfile.tsx
+AuthContext.tsx
+
+// ✅ Good - camelCase for utilities/services
+authService.ts
+userUtils.ts
+
+// ✅ Good - kebab-case for routes (Expo Router)
+app/(auth)/login.tsx
+app/(tabs)/dashboard.tsx
+
+// ✅ Good - styles colocation
+components/
+  UserCard.tsx
+  UserCard.styles.ts
+
+// ❌ Bad
+userprofile.tsx
+auth_service.ts
+Dashboard.js  // Missing .tsx extension
+```
+
+---
+
+## 4. TypeScript Standards
+
+### 4.1 Type Definitions
+```typescript
+// ✅ Good - Explicit interface definitions
+interface User {
+  id: string;
+  email: string;
+  profile?: UserProfile;
+}
+
+interface UserProfile {
+  fullName: string;
+  avatar?: string;
+}
+
+// ✅ Good - Generic type constraints
+interface ApiResponse<T> {
+  data: T;
+  success: boolean;
+  message?: string;
+}
+
+// ❌ Bad - Using 'any'
+const user: any = getUserData();
+
+// ❌ Bad - Implicit types
+const userData = {
+  name: "John",
+  age: 30
+};
+```
+
+### 4.2 Function Signatures
+```typescript
+// ✅ Good - Explicit parameter and return types
+/**
+ * Creates a new journal entry for the authenticated user
+ * @param content - The journal entry content
+ * @param mood - User's current mood rating
+ * @returns Promise resolving to the created entry
+ */
+async function createJournalEntry(
+  content: string, 
+  mood: MoodType
+): Promise<JournalEntry> {
+  // Implementation
+}
+
+// ❌ Bad - Missing types
+async function createJournalEntry(content, mood) {
+  // Implementation
+}
+```
+
+---
+
+## 5. React Native Component Standards
+
+### 5.1 Component Structure
+```typescript
+// ✅ Good - Functional component with proper typing and React Native logging
+import React from 'react';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { logger } from '@/lib/logger';
+import { styles } from './UserCard.styles';
+
+interface UserCardProps {
+  user: User;
+  onPress: (userId: string) => void;
+  variant?: 'default' | 'compact';
+}
+
+/**
+ * UserCard component displays user information in a card format
+ * Supports default and compact variants for different layouts
+ */
+export const UserCard: React.FC<UserCardProps> = ({ 
+  user, 
+  onPress, 
+  variant = 'default' 
+}) => {
+  /**
+   * Handles card press and triggers parent callback
+   */
+  const handlePress = () => {
+    logger.info('UserCard pressed', { userId: user.id, variant });
+    onPress(user.id);
+  };
+
+  return (
+    <TouchableOpacity 
+      style={[styles.container, styles[variant]]} 
+      onPress={handlePress}
+    >
+      <Text style={styles.name}>{user.profile?.fullName}</Text>
+      <Text style={styles.email}>{user.email}</Text>
+    </TouchableOpacity>
+  );
+};
+
+// ❌ Bad - Missing types, no comments, inline styles
+export const UserCard = ({ user, onPress }) => {
+  return (
+    <TouchableOpacity 
+      style={{ padding: 16, backgroundColor: '#fff' }}
+      onPress={() => onPress(user.id)}
+    >
+      <Text>{user.name}</Text>
+    </TouchableOpacity>
+  );
+};
+```
+
+### 5.2 Styling Standards (Unistyles)
+```typescript
+// ✅ Good - Colocated styles file
+// UserCard.styles.ts
+import { createStyleSheet } from 'react-native-unistyles';
+
+export const styles = createStyleSheet((theme) => ({
+  container: {
+    backgroundColor: theme.colors.componentBackground,
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  default: {
+    minHeight: 120,
+  },
+  compact: {
+    minHeight: 80,
+    padding: 12,
+  },
+  name: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+    marginBottom: 4,
+  },
+  email: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+  },
+}));
+
+// ❌ Bad - Inline styles or StyleSheet.create
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: '#1F2937', // Hardcoded colors
+  },
+});
+```
+
+---
+
+## 6. State Management (Zustand)
+
+### 6.1 Store Structure
+```typescript
+// ✅ Good - Atomic store with proper typing and React Native logging
+import { create } from 'zustand';
+import { devtools } from 'zustand/middleware';
+import { logger } from '@/lib/logger';
+
+interface AuthState {
+  user: User | null;
+  isLoading: boolean;
+  error: string | null;
+}
+
+interface AuthActions {
+  setUser: (user: User) => void;
+  clearUser: () => void;
+  setLoading: (loading: boolean) => void;
+  setError: (error: string | null) => void;
+}
+
+type AuthStore = AuthState & AuthActions;
+
+/**
+ * Authentication store managing user session state
+ * Handles login, logout, and authentication status
+ */
+export const useAuthStore = create<AuthStore>()(
+  devtools(
+    (set) => ({
+      // State
+      user: null,
+      isLoading: false,
+      error: null,
+      
+      // Actions
+      setUser: (user) => {
+        logger.info('User set in auth store', { userId: user.id });
+        set({ user, error: null });
+      },
+      
+      clearUser: () => {
+        logger.info('User cleared from auth store');
+        set({ user: null, error: null });
+      },
+      
+      setLoading: (isLoading) => set({ isLoading }),
+      
+      setError: (error) => {
+        logger.error('Auth error set', { error });
+        set({ error, isLoading: false });
+      },
+    }),
+    { name: 'auth-store' }
+  )
+);
+
+// ❌ Bad - Monolithic store, missing types
+export const useAppStore = create((set) => ({
+  user: null,
+  posts: [],
+  comments: [],
+  // Too much state in one store
+}));
+```
+
+---
+
+## 7. API & Service Patterns
+
+### 7.1 Supabase Service Pattern
+```typescript
+// ✅ Good - Service with validation and error handling using React Native logging
+import { supabase } from '@/lib/supabase';
+import { z } from 'zod';
+import { logger } from '@/lib/logger';
+
+const journalEntrySchema = z.object({
+  content: z.string().min(10, 'Entry must be at least 10 characters'),
+  mood: z.enum(['happy', 'sad', 'neutral']),
+});
+
+type CreateJournalEntryData = z.infer<typeof journalEntrySchema>;
+
+/**
+ * Journal service handling all journal-related database operations
+ * Uses Supabase client with RLS for security
+ */
+export class JournalService {
+  /**
+   * Creates a new journal entry for the authenticated user
+   * Validates input data before database insertion
+   */
+  static async createEntry(
+    userId: string, 
+    entryData: unknown
+  ): Promise<JournalEntry> {
+    logger.info('Creating journal entry', { userId });
+    
+    // Validate input data
+    const validationResult = journalEntrySchema.safeParse(entryData);
+    if (!validationResult.success) {
+      logger.error('Invalid journal entry data', { 
+        userId, 
+        errors: validationResult.error.issues 
+      });
+      throw new Error('Invalid journal entry data', { 
+        cause: validationResult.error 
+      });
+    }
+
+    const validatedData = validationResult.data;
+
+    // Insert into database
+    const { data, error } = await supabase
+      .from('journal_entries')
+      .insert({
+        user_id: userId,
+        content: validatedData.content,
+        mood: validatedData.mood,
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (error) {
+      logger.error('Failed to create journal entry', { userId, error });
+      throw new Error('Failed to create journal entry', { cause: error });
+    }
+
+    logger.info('Journal entry created successfully', { 
+      userId, 
+      entryId: data.id 
+    });
+    
+    return data;
+  }
+}
+
+// ❌ Bad - No validation, poor error handling
+export const createEntry = async (data) => {
+  const { data: result } = await supabase
+    .from('journal_entries')
+    .insert(data);
+  return result;
+};
+```
+
+### 7.2 AI API Client Pattern
+```typescript
+// ✅ Good - Dedicated AI client with auth and React Native logging
+import { supabase } from './supabase';
+import { logger } from './logger';
+
+const AI_BACKEND_URL = process.env.EXPO_PUBLIC_AI_BACKEND_URL;
+
+/**
+ * Gets the current user's auth token for API requests
+ */
+async function getAuthHeader(): Promise<string> {
+  const { data: { session }, error } = await supabase.auth.getSession();
+  
+  if (error || !session?.access_token) {
+    logger.error('No active session found', { error });
+    throw new Error('No active session found. User must be logged in.');
+  }
+  
+  return `Bearer ${session.access_token}`;
+}
+
+/**
+ * AI API client for communicating with the Python backend
+ * Automatically handles authentication and error responses
+ */
+export const aiApiClient = {
+  /**
+   * Makes a POST request to the AI backend
+   */
+  async post<T>(endpoint: string, body: unknown): Promise<T> {
+    logger.info('Making AI API request', { endpoint });
+    
+    try {
+      const response = await fetch(`${AI_BACKEND_URL}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': await getAuthHeader(),
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        logger.error('AI API request failed', { 
+          endpoint, 
+          status: response.status, 
+          error: errorData 
+        });
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
+      }
+      
+      const result = await response.json();
+      logger.info('AI API request successful', { endpoint });
+      return result;
+      
+    } catch (error) {
+      logger.error('AI API request error', { endpoint, error });
+      throw error;
+    }
+  },
+};
+```
+
+---
+
+## 8. Commenting Standards (JSDoc3)
+
+### 8.1 Function Documentation
+```typescript
+// ✅ Good - Complete JSDoc documentation
+/**
+ * Transforms user input text by applying lexicon word replacements
+ * Uses the user's personal lexicon to replace limiting words with empowering ones
+ * 
+ * @param text - The original text to transform
+ * @param lexicon - Array of word replacement pairs
+ * @param options - Transformation options
+ * @param options.caseSensitive - Whether to match case exactly
+ * @param options.wholeWordsOnly - Whether to match whole words only
+ * @returns Object containing original text, transformed text, and applied transformations
+ * 
+ * @example
+ * ```typescript
+ * const result = transformText("I can't do this", [
+ *   { from: "can't", to: "choose not to" }
+ * ]);
+ * console.log(result.transformedText); // "I choose not to do this"
+ * ```
+ * 
+ * @throws {Error} When lexicon is empty or malformed
+ * @since 1.0.0
+ */
+async function transformText(
+  text: string,
+  lexicon: WordPair[],
+  options: TransformOptions = {}
+): Promise<TransformResult> {
+  // Implementation with detailed inline comments
+}
+
+// ❌ Bad - No documentation
+function transformText(text, lexicon, options) {
+  // Implementation
+}
+```
+
+### 8.2 Inline Comments
+```typescript
+// ✅ Good - Explains the "why" not just the "what"
+export const RecordingScreen: React.FC = () => {
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioUri, setAudioUri] = useState<string | null>(null);
+  
+  /**
+   * Handles the recording start/stop toggle
+   * Manages audio permissions and recording state
+   */
+  const handleRecordingToggle = async () => {
+    if (isRecording) {
+      // Stop recording and save the audio file
+      console.log('Stopping audio recording');
+      await stopRecording();
+    } else {
+      // Request permissions before starting recording
+      // This is required on both iOS and Android
+      const hasPermission = await requestAudioPermission();
+      if (!hasPermission) {
+        console.warn('Audio permission denied');
+        Alert.alert('Permission Required', 'Please enable microphone access');
+        return;
+      }
+      
+      console.log('Starting audio recording');
+      await startRecording();
+    }
+  };
+
+  // ❌ Bad - States the obvious
+  const handlePress = () => {
+    setIsRecording(!isRecording); // Toggle recording state
+  };
+```
+
+---
+
+## 9. Logging Standards by Environment
+
+### 9.1 React Native/Expo Logging
+
+For React Native/Expo applications, use structured console logging with optional remote logging services.
+
+```typescript
+// ✅ Good - Structured console logging for React Native
+// lib/logger.ts
+
+interface LogEntry {
+  level: 'debug' | 'info' | 'warn' | 'error';
+  message: string;
+  timestamp: string;
+  service: string;
+  userId?: string;
+  metadata?: Record<string, any>;
+}
+
+/**
+ * React Native logger utility for structured logging
+ * Provides consistent logging format across the mobile app
+ */
+class Logger {
+  private service = 'archie-mobile';
+  private version = '1.0.0';
+
+  /**
+   * Creates a structured log entry
+   */
+  private createLogEntry(
+    level: LogEntry['level'],
+    message: string,
+    metadata: Record<string, any> = {}
+  ): LogEntry {
+    return {
+      level,
+      message,
+      timestamp: new Date().toISOString(),
+      service: this.service,
+      ...metadata,
+    };
+  }
+
+  /**
+   * Logs debug information (development only)
+   */
+  debug(message: string, metadata?: Record<string, any>): void {
+    if (__DEV__) {
+      const entry = this.createLogEntry('debug', message, metadata);
+      console.log('🐛 DEBUG:', JSON.stringify(entry, null, 2));
+    }
+  }
+
+  /**
+   * Logs general information
+   */
+  info(message: string, metadata?: Record<string, any>): void {
+    const entry = this.createLogEntry('info', message, metadata);
+    console.log('ℹ️ INFO:', JSON.stringify(entry, null, 2));
+  }
+
+  /**
+   * Logs warning messages
+   */
+  warn(message: string, metadata?: Record<string, any>): void {
+    const entry = this.createLogEntry('warn', message, metadata);
+    console.warn('⚠️ WARN:', JSON.stringify(entry, null, 2));
+  }
+
+  /**
+   * Logs error messages
+   */
+  error(message: string, metadata?: Record<string, any>): void {
+    const entry = this.createLogEntry('error', message, metadata);
+    console.error('❌ ERROR:', JSON.stringify(entry, null, 2));
+    
+    // In production, send to remote logging service
+    if (!__DEV__) {
+      this.sendToRemoteLogging(entry);
+    }
+  }
+
+  /**
+   * Sends critical logs to remote service in production
+   */
+  private async sendToRemoteLogging(entry: LogEntry): Promise<void> {
+    try {
+      // Example: Send to your logging API endpoint
+      await fetch(`${process.env.EXPO_PUBLIC_API_URL}/logs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry),
+      });
+    } catch (error) {
+      // Failsafe: Don't let logging errors crash the app
+      console.error('Failed to send log to remote service:', error);
+    }
+  }
+}
+
+export const logger = new Logger();
+```
+
+### 9.2 React Native Logging Usage
+```typescript
+// ✅ Good - Comprehensive logging throughout React Native workflow
+import { logger } from '@/lib/logger';
+
+export const LoginScreen: React.FC = () => {
+  const navigation = useNavigation();
+  const { setUser } = useAuthStore();
+
+  const handleLogin = async (email: string, password: string) => {
+    logger.info('Login attempt started', { email });
+    
+    try {
+      // Log the authentication attempt
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (error) {
+        logger.error('Login failed', { 
+          email, 
+          error: error.message,
+          errorCode: error.status 
+        });
+        Alert.alert('Login Failed', error.message);
+        return;
+      }
+      
+      if (data.user) {
+        logger.info('Login successful', { 
+          userId: data.user.id, 
+          email: data.user.email 
+        });
+        
+        setUser(data.user);
+        navigation.navigate('(tabs)');
+      }
+    } catch (error) {
+      logger.error('Unexpected login error', { email, error });
+      Alert.alert('Error', 'An unexpected error occurred');
+    }
+  };
+
+  // ❌ Bad - No logging
+  const handleLogin = async (email, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (data.user) {
+      setUser(data.user);
+    }
+  };
+```
+
+### 9.3 Node.js Backend Logging (Winston)
+
+For Node.js backend services, use Winston for comprehensive server-side logging.
+
+```typescript
+// ✅ Good - Winston configuration for Node.js backend
+// lib/logger.ts (Node.js backend only)
+import winston from 'winston';
+
+/**
+ * Winston logger instance configured for Node.js backend services
+ * Provides structured logging with different levels for debugging and monitoring
+ */
+export const logger = winston.createLogger({
+  level: process.env.NODE_ENV === 'development' ? 'debug' : 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.errors({ stack: true }),
+    winston.format.json()
+  ),
+  defaultMeta: { 
+    service: 'archie-backend',
+    version: '1.0.0'
+  },
+  transports: [
+    new winston.transports.Console({
+      format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.simple()
+      )
+    }),
+  ],
+});
+
+// Add file transport for production
+if (process.env.NODE_ENV === 'production') {
+  logger.add(new winston.transports.File({ 
+    filename: 'app-errors.log', 
+    level: 'error' 
+  }));
+}
+```
+
+### 9.4 Python Backend Logging
+
+For the Python FastAPI backend, use the built-in logging module with JSON formatting.
+
+```python
+# ✅ Good - Python logging configuration
+# logger.py (Python backend)
+import logging
+import json
+from pythonjsonlogger import jsonlogger
+
+# Get the logger instance
+logger = logging.getLogger("archie-ai-backend")
+logger.setLevel(logging.INFO)
+
+# Create a handler to output to console
+logHandler = logging.StreamHandler()
+
+# Create a JSON formatter and add it to the handler
+formatter = jsonlogger.JsonFormatter(
+    '%(asctime)s %(name)s %(levelname)s %(message)s'
+)
+logHandler.setFormatter(formatter)
+
+# Add the handler to the logger
+if not logger.handlers:
+    logger.addHandler(logHandler)
+
+# Usage example in FastAPI route
+@app.post("/api/summarize")
+async def summarize_text(request: Request):
+    logger.info("Summarize endpoint called", extra={'request_id': request.headers.get('x-request-id')})
+    
+    try:
+        # Business logic here
+        logger.info("Successfully generated summary")
+        return {"status": "success"}
+    except Exception as e:
+        logger.error("Error in summarize endpoint", extra={'error': str(e)}, exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+```
+
+---
+
+## 10. Variable & Function Naming (Airbnb Standards)
+
+### 10.1 Variables
+```typescript
+// ✅ Good - Descriptive camelCase
+const userAuthToken = session.access_token;
+const isLoadingUserData = true;
+const journalEntryCount = entries.length;
+
+// ✅ Good - Boolean naming
+const isAuthenticated = !!user;
+const hasUnreadNotifications = notifications.some(n => !n.read);
+const canEditProfile = user?.id === profileId;
+
+// ❌ Bad - Unclear abbreviations
+const usr = getCurrentUser();
+const cnt = getCount();
+const flg = true;
+```
+
+### 10.2 Functions
+```typescript
+// ✅ Good - Verb + noun pattern
+const getUserProfile = (userId: string) => { /* */ };
+const calculateMoodScore = (entries: JournalEntry[]) => { /* */ };
+const validateEmailFormat = (email: string) => { /* */ };
+
+// ✅ Good - Handler naming
+const handleUserLogin = () => { /* */ };
+const handleFormSubmit = () => { /* */ };
+const handleNavigateToProfile = () => { /* */ };
+
+// ❌ Bad - Unclear purpose
+const process = () => { /* */ };
+const doStuff = () => { /* */ };
+const func1 = () => { /* */ };
+```
+
+---
+
+## 11. Import/Export Standards
+
+### 11.1 Import Organization
+```typescript
+// ✅ Good - Organized import groups
+// 1. React and React Native imports
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, Alert } from 'react-native';
+
+// 2. Third-party libraries
+import { useNavigation } from '@react-navigation/native';
+import { z } from 'zod';
+
+// 3. Internal utilities and services
+import { supabase } from '@/lib/supabase';
+import { logger } from '@/lib/logger';
+
+// 4. Stores and contexts
+import { useAuthStore } from '@/stores/authStore';
+
+// 5. Components
+import { Button } from '@/components/Button';
+
+// 6. Types
+import type { User, JournalEntry } from '@/types';
+
+// 7. Styles (always last)
+import { styles } from './LoginScreen.styles';
+
+// ❌ Bad - Mixed import order
+import { styles } from './styles';
+import React from 'react';
+import { supabase } from '@/lib/supabase';
+import { View } from 'react-native';
+```
+
+### 11.2 Export Standards
+```typescript
+// ✅ Good - Named exports for utilities
+export const formatDate = (date: Date): string => {
+  return date.toISOString().split('T')[0];
+};
+
+export const validateEmail = (email: string): boolean => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+};
+
+// ✅ Good - Default export for main component
+export default function LoginScreen() {
+  // Component implementation
+}
+
+// ✅ Good - Combined exports
+export { default as LoginScreen } from './LoginScreen';
+export { default as SignupScreen } from './SignupScreen';
+
+// ❌ Bad - Mixing default and named for main component
+export { LoginScreen as default };
+```
+
+---
+
+## 12. Error Handling Standards
+
+### 12.1 Service Layer Error Handling
+```typescript
+// ✅ Good - Comprehensive error handling with React Native logging
+export class UserService {
+  static async updateProfile(
+    userId: string, 
+    profileData: UpdateProfileData
+  ): Promise<UserProfile> {
+    logger.info('Updating user profile', { userId });
+    
+    try {
+      // Validate input
+      const validatedData = updateProfileSchema.parse(profileData);
+      
+      // Attempt database update
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .update(validatedData)
+        .eq('user_id', userId)
+        .select()
+        .single();
+
+      if (error) {
+        logger.error('Database error updating profile', { 
+          userId, 
+          error: error.message,
+          code: error.code 
+        });
+        throw new UserServiceError('Failed to update profile', error);
+      }
+
+      logger.info('Profile updated successfully', { userId });
+      return data;
+      
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        logger.error('Profile validation failed', { 
+          userId, 
+          validationErrors: error.issues 
+        });
+        throw new ValidationError('Invalid profile data', error.issues);
+      }
+      
+      logger.error('Unexpected error updating profile', { userId, error });
+      throw error;
+    }
+  }
+}
+
+// ❌ Bad - Silent errors, no logging
+export const updateProfile = async (userId, data) => {
+  const { data: result } = await supabase
+    .from('user_profiles')
+    .update(data)
+    .eq('user_id', userId);
+  return result;
+};
+```
+
+---
+
+## 13. Testing Standards
+
+### 13.1 Test File Organization
+```typescript
+// ✅ Good - Comprehensive test structure
+// __tests__/services/UserService.test.ts
+import { UserService } from '@/services/UserService';
+import { supabase } from '@/lib/supabase';
+
+// Mock dependencies
+jest.mock('@/lib/supabase');
+jest.mock('@/lib/logger');
+
+describe('UserService', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('updateProfile', () => {
+    /**
+     * Test successful profile update with valid data
+     */
+    it('should update profile successfully with valid data', async () => {
+      // Arrange
+      const userId = 'user-123';
+      const profileData = {
+        fullName: 'John Doe',
+        bio: 'Software developer',
+      };
+      
+      const mockResponse = { data: { ...profileData, id: userId } };
+      (supabase.from as jest.Mock).mockReturnValue({
+        update: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            select: jest.fn().mockReturnValue({
+              single: jest.fn().mockResolvedValue(mockResponse),
+            }),
+          }),
+        }),
+      });
+
+      // Act
+      const result = await UserService.updateProfile(userId, profileData);
+
+      // Assert
+      expect(result).toEqual(mockResponse.data);
+      expect(supabase.from).toHaveBeenCalledWith('user_profiles');
+    });
+
+    /**
+     * Test error handling when database update fails
+     */
+    it('should throw error when database update fails', async () => {
+      // Arrange
+      const userId = 'user-123';
+      const profileData = { fullName: 'John Doe' };
+      const dbError = { message: 'Database error', code: 'DB001' };
+      
+      (supabase.from as jest.Mock).mockReturnValue({
+        update: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            select: jest.fn().mockReturnValue({
+              single: jest.fn().mockResolvedValue({ error: dbError }),
+            }),
+          }),
+        }),
+      });
+
+      // Act & Assert
+      await expect(
+        UserService.updateProfile(userId, profileData)
+      ).rejects.toThrow('Failed to update profile');
+    });
+  });
+});
+```
+
+---
+
+## 14. Performance Standards
+
+### 14.1 Component Optimization
+```typescript
+// ✅ Good - Optimized component with memoization and React Native logging
+import React, { memo, useMemo, useCallback } from 'react';
+import { logger } from '@/lib/logger';
+
+interface JournalEntryListProps {
+  entries: JournalEntry[];
+  onEntryPress: (entryId: string) => void;
+}
+
+/**
+ * Optimized journal entry list component
+ * Uses memoization to prevent unnecessary re-renders
+ */
+export const JournalEntryList: React.FC<JournalEntryListProps> = memo(({ 
+  entries, 
+  onEntryPress 
+}) => {
+  /**
+   * Memoized filtered and sorted entries
+   * Only recalculates when entries array changes
+   */
+  const processedEntries = useMemo(() => {
+    return entries
+      .filter(entry => entry.content.length > 0)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [entries]);
+
+  /**
+   * Memoized entry press handler to prevent function recreation
+   */
+  const handleEntryPress = useCallback((entryId: string) => {
+    logger.info('Journal entry pressed', { entryId });
+    onEntryPress(entryId);
+  }, [onEntryPress]);
+
+  return (
+    <View style={styles.container}>
+      {processedEntries.map(entry => (
+        <JournalEntryCard
+          key={entry.id}
+          entry={entry}
+          onPress={handleEntryPress}
+        />
+      ))}
+    </View>
+  );
+});
+
+// ❌ Bad - No optimization, creates new functions on every render
+export const JournalEntryList = ({ entries, onEntryPress }) => {
+  const sortedEntries = entries.sort((a, b) => 
+    new Date(b.createdAt) - new Date(a.createdAt)
+  );
+
+  return (
+    <View>
+      {sortedEntries.map(entry => (
+        <JournalEntryCard
+          key={entry.id}
+          entry={entry}
+          onPress={() => onEntryPress(entry.id)} // New function every render
+        />
+      ))}
+    </View>
+  );
+};
+```
+
+---
+
+## 15. Security Standards
+
+### 15.1 Data Sanitization
+```typescript
+// ✅ Good - Input sanitization and validation
+import DOMPurify from 'dompurify';
+import { z } from 'zod';
+
+const sanitizeUserInput = (input: string): string => {
+  // Remove potential XSS vectors
+  return DOMPurify.sanitize(input.trim());
+};
+
+const journalEntrySchema = z.object({
+  content: z.string()
+    .min(1, 'Content is required')
+    .max(5000, 'Content too long')
+    .transform(sanitizeUserInput),
+  mood: z.enum(['happy', 'neutral', 'sad']),
+});
+
+/**
+ * Safely processes user journal entry input
+ * Validates and sanitizes all user-provided data
+ */
+export const processJournalEntry = (rawInput: unknown): JournalEntryData => {
+  logger.info('Processing journal entry input');
+  
+  try {
+    return journalEntrySchema.parse(rawInput);
+  } catch (error) {
+    logger.error('Invalid journal entry input', { error });
+    throw new ValidationError('Invalid journal entry data');
+  }
+};
+
+// ❌ Bad - No validation or sanitization
+export const processJournalEntry = (input) => {
+  return {
+    content: input.content,
+    mood: input.mood,
+  };
+};
+```
+
+---
+
+## 16. Enforcement & Tools
+
+### 16.1 ESLint Configuration
+```json
+// .eslintrc.js
+module.exports = {
+  extends: [
+    '@expo/eslint-config',
+    'airbnb',
+    'airbnb-typescript',
+    'prettier'
+  ],
+  rules: {
+    // Archie-specific rules
+    'max-lines': ['error', { max: 500, skipComments: true }],
+    'require-jsdoc': ['error', {
+      require: {
+        FunctionDeclaration: true,
+        MethodDefinition: true,
+        ClassDeclaration: true,
+        ArrowFunctionExpression: false,
+        FunctionExpression: false
+      }
+    }],
+    '@typescript-eslint/explicit-function-return-type': 'error',
+    'prefer-const': 'error',
+    'no-var': 'error',
+  }
+};
+```
+
+### 16.2 Pre-commit Hooks
+```json
+// package.json
+{
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write",
+      "git add"
+    ]
+  }
+}
+```
+
+---
+
+## 17. Conclusion
+
+These styling guidelines ensure that the Archie codebase remains:
+- **Consistent** across all team members
+- **Maintainable** for long-term development
+- **Scalable** as the project grows
+- **Professional** following industry best practices
+
+**Remember**: Code is read far more often than it's written. Write for the next developer (including your future self)!
+
+**All guidelines are mandatory and will be enforced through code review and automated tooling.**
+
+---
+
+*Based on Airbnb JavaScript Style Guide with adaptations for TypeScript, React Native, and the Archie tech stack.*

@@ -72,36 +72,119 @@ Deno.serve(async (req: Request) => {
 
         // ---------------- Router (v0.2) ---------------- //
     // Simple heuristic: always run emotion & theme workers in addition to legacy summary.
-    const workersToInvoke = ['legacy_gemini', 'emotion', 'theme'];
+    const workersToInvoke = ['legacy_gemini', 'emotion', 'theme', 'cbt_identifier'];
+    if (session.reframed_text) {
+      workersToInvoke.push('cbt_reframer');
+    }
     log('info', 'router_decision', { workersToInvoke });
 
     // ---------------- Worker Invocation ---------------- //
     const workerResults = await Promise.all(workersToInvoke.map(async (w) => {
-            if (w === 'legacy_gemini') {
-        return legacyGeminiWorker(session, userPrinciples);
+      try {
+        if (w === 'legacy_gemini') {
+          return legacyGeminiWorker(session, userPrinciples);
+        }
+        if (w === 'emotion') {
+          const { data, error } = await supabase.functions.invoke('emotion-worker', {
+            body: { transcript: session.original_transcript },
+          });
+          if (error) throw error;
+          return { type: 'emotion', data } as WorkerResult;
+        }
+        if (w === 'theme') {
+          const { data, error } = await supabase.functions.invoke('theme-worker', {
+            body: { transcript: session.original_transcript },
+          });
+          if (error) throw error;
+          return { type: 'theme', data } as WorkerResult;
+        }
+        if (w === 'cbt_identifier') {
+          const { data, error } = await supabase.functions.invoke('cbt-identifier-worker', {
+            body: { transcript: session.original_transcript },
+          });
+          if (error) throw error;
+          return { type: 'cbt_identifier', data } as WorkerResult;
+        }
+        if (w === 'cbt_reframer') {
+          const { data, error } = await supabase.functions.invoke('cbt-reframer-worker', {
+            body: { original: session.original_transcript, reframed: session.reframed_text },
+          });
+          if (error) throw error;
+          return { type: 'cbt_reframer', data } as WorkerResult;
+        }
+        return null;
+      } catch (err) {
+        log('error', 'worker_failed', { worker: w, err: err instanceof Error ? err.message : String(err) });
+        return null;
       }
-      if (w === 'emotion') {
-        return emotionWorker(session.original_transcript);
-      }
-      if (w === 'theme') {
-        return themeWorker(session, supabase);
-      }
-      return null;
     }));
 
         // Merge worker outputs - start with legacy summary as base
     const legacyResp: any = workerResults.find(r => r && r.type === 'legacy')?.data || {};
     const emotionResp: any = workerResults.find(r => r && r.type === 'emotion')?.data || {};
     const themeResp: any = workerResults.find(r => r && r.type === 'theme')?.data || {};
+    const cbtIdentifierResp: any = workerResults.find(r => r && r.type === 'cbt_identifier')?.data || {};
+    const cbtReframerResp: any = workerResults.find(r => r && r.type === 'cbt_reframer')?.data || {};
+
+    const normalizeArray = (val: any): string[] => Array.isArray(val) ? val : (typeof val === 'object' && val !== null ? Object.values(val) as string[] : []);
+    const mergedMoods = normalizeArray(emotionResp.emotions ?? legacyResp.mood);
+    const formatBreakdown = (data: any): string => {
+      if (typeof data !== 'object' || data === null) return String(data ?? '');
+      return Object.entries(data)
+        .map(([key, val]) => {
+          const title = key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+          const valueStr = Array.isArray(val) ? val.join(', ') : String(val);
+          return `${title}: ${valueStr}`;
+        })
+        .join('\n');
+    };
+
+    const entryBreakdownStr = typeof legacyResp.entry_breakdown === 'string'
+      ? legacyResp.entry_breakdown
+      : formatBreakdown(legacyResp.entry_breakdown ?? {});
 
     const response = {
       ...legacyResp,
-      emotions: emotionResp.emotions ?? legacyResp.mood ?? [],
+      entry_breakdown: entryBreakdownStr,
+      mood: mergedMoods,
+      emotions: mergedMoods,
+      identified_themes: themeResp.themes ?? legacyResp.identified_themes ?? [],
       themes: themeResp.themes ?? legacyResp.identified_themes ?? [],
-    };
+      cbt_insights: cbtIdentifierResp.insights ?? [],
+      cbt_reframes: cbtReframerResp.reframes ?? [],
+    } as const;
 
-    // async persist
+    // async persist session + insights
     supabase.from('journal_sessions').update({ ai_analysis: response }).eq('id', session.id);
+
+    // Persist themes to journal_themes (if new)
+    if (response.themes.length) {
+      await Promise.all(response.themes.map(async (theme: string) => {
+        const { error } = await supabase.from('journal_themes').insert({
+          user_id: session.user_id,
+          entry_id: session.id,
+          theme,
+          embedding: '[]',
+        });
+        if (error && error.code !== '23505') { // ignore duplicates
+          log('error', 'theme_insert_failed', { theme, err: error.message });
+        }
+      }));
+    }
+
+    // upsert entry_insights row centrally
+    const { error: insightsErr } = await supabase.from('entry_insights').upsert({
+      entry_id: session.id,
+      emotions: mergedMoods,
+      themes: response.identified_themes,
+      cbt: {
+        insights: response.cbt_insights,
+        reframes: response.cbt_reframes,
+      },
+    });
+    if (insightsErr) {
+      log('error', 'insights_upsert_failed', { err: insightsErr.message });
+    }
 
     log('info', 'analysis_complete', { processingMs: Date.now() - start });
 
@@ -147,12 +230,65 @@ async function themeWorker(session: any, supabase: any): Promise<WorkerResult> {
   const prompt = `Identify 2-3 recurring life themes present in the following text. Return JSON array of strings.`;
   const themes: string[] = await callLLM(prompt, session.original_transcript);
 
-  // Persist each theme row with dummy zero-vector for now
-  await Promise.all(themes.map((theme) =>
-    supabase.from('journal_themes').insert({ user_id: session.user_id, entry_id: session.id, theme, embedding: '[]' })
-  ));
+    // Persist each theme row with dummy zero-vector for now with error logging
+  for (const theme of themes) {
+    const { error } = await supabase.from('journal_themes').insert({
+      user_id: session.user_id,
+      entry_id: session.id,
+      theme,
+      embedding: '[]',
+    });
+    if (error) {
+      log('error', 'theme_insert_failed', { theme, err: error.message });
+    }
+  }
 
   return { type: 'theme', data: { themes } };
+}
+
+async function cbtIdentifierWorker(transcript: string): Promise<WorkerResult> {
+  try {
+    const prompt = `Analyze the following journal entry for common cognitive distortions. 
+      Return a JSON array of objects with the following structure:
+      [{
+        "distortion": "Name of the cognitive distortion (e.g., 'All-or-Nothing Thinking', 'Overgeneralization')",
+        "quote": "The exact quote from the text that contains the distortion",
+        "explanation": "Brief explanation of why this is a cognitive distortion"
+      }]`;
+      
+    const insights = await callLLM(prompt, transcript);
+    return { 
+      type: 'cbt_identifier', 
+      data: { insights: Array.isArray(insights) ? insights : [] } 
+    };
+  } catch (error) {
+    log('error', 'cbt_identifier_failed', { error: error instanceof Error ? error.message : String(error) });
+    return { type: 'cbt_identifier', data: { insights: [] } };
+  }
+}
+
+async function cbtReframerWorker(originalText: string, reframedText: string): Promise<WorkerResult> {
+  try {
+    const prompt = `Compare the original and reframed journal entries below. 
+      For each significant reframing, provide a structured analysis:
+      {
+        "original_thought": "Original thought from the text",
+        "reframed_thought": "The reframed version",
+        "technique_used": "CBT technique used (e.g., cognitive restructuring, evidence-based thinking)",
+        "benefit": "How this reframing could be beneficial"
+      }`;
+      
+    const comparisonPrompt = `Original: ${originalText}\n\nReframed: ${reframedText}`;
+    const reframes = await callLLM(prompt, comparisonPrompt);
+    
+    return { 
+      type: 'cbt_reframer', 
+      data: { reframes: Array.isArray(reframes) ? reframes : [] } 
+    };
+  } catch (error) {
+    log('error', 'cbt_reframer_failed', { error: error instanceof Error ? error.message : String(error) });
+    return { type: 'cbt_reframer', data: { reframes: [] } };
+  }
 }
 
 // Generic helper to call Gemini flash and parse JSON array
@@ -181,7 +317,7 @@ async function callGeminiAnalysis(request: {
   const key = Deno.env.get('GEMINI_API_KEY');
   if (!key) throw new Error('GEMINI_API_KEY not set');
 
-  const prompt = `You are Archie's Router-Worker prototype. Return JSON with entry_breakdown, mood, people, identified_themes, actionable_insight {reflection_prompt, action_suggestion?}`;
+  const prompt = `You are Archie's Router-Worker prototype. Respond ONLY with pure JSON (no markdown fences) containing exactly these keys: entry_breakdown, mood, people, identified_themes, actionable_insight. The actionable_insight object must have reflection_prompt and may have action_suggestion {title, description}.`;
   const userJson = JSON.stringify(request);
 
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${key}`, {
@@ -195,11 +331,17 @@ async function callGeminiAnalysis(request: {
 
   if (!res.ok) throw new Error(`Gemini API error ${res.status}`);
   const json = await res.json();
-  const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
-  try {
-    return JSON.parse(rawText);
-  } catch (_) {
-    log('error', 'gemini_parse_error', { rawText });
-    return { entry_breakdown: 'Parse error', mood: [], people: [], identified_themes: [], actionable_insight: { reflection_prompt: '...' } };
+  let rawText = json.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
+  rawText = rawText.trim();
+  if (rawText.startsWith('```')) {
+    rawText = rawText.replace(/```[a-zA-Z]*\n?/,'').replace(/```$/,'');
   }
+    let parsed;
+  try {
+    parsed = JSON.parse(rawText);
+  } catch (e) {
+    log('error', 'gemini_parse_error', { rawText });
+    parsed = { entry_breakdown: 'Parse error', mood: [], people: [], identified_themes: [], actionable_insight: { reflection_prompt: '...' } };
+  }
+  return parsed;
 }

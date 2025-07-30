@@ -14,24 +14,18 @@ import { logger } from './logger';
 
 import Constants from 'expo-constants';
 
-// Import environment variables
-import { AGENTIC_ANALYSIS as ENV_AGENTIC_ANALYSIS } from '@env';
-
 // Get AI backend URL from Expo configuration
 const AI_BACKEND_URL = Constants.expoConfig?.extra?.aiBackendUrl;
 
-// Debug log environment values
-console.log('Environment variables:', {
-  ENV_AGENTIC_ANALYSIS,
-  appJsonConfig: Constants.expoConfig?.extra?.agenticAnalysis,
-  fromEnvFile: process.env.AGENTIC_ANALYSIS
-});
-
 // Feature flag to toggle new Router-Worker (agentic) analysis endpoint
-// Priority: 1. Environment variable, 2. app.json config, 3. Default to 'disabled'
-const AGENTIC_ANALYSIS = (ENV_AGENTIC_ANALYSIS || Constants.expoConfig?.extra?.agenticAnalysis || 'disabled') as 'enabled' | 'disabled';
+// Gets the value from Expo config (app.json) and defaults to 'disabled' if not set
+const AGENTIC_ANALYSIS = (Constants.expoConfig?.extra?.agenticAnalysis || 'disabled') as 'enabled' | 'disabled';
 
-console.log('Final AGENTIC_ANALYSIS value:', AGENTIC_ANALYSIS);
+// Debug log the configuration
+console.log('AI Client Configuration:', {
+  agenticAnalysis: AGENTIC_ANALYSIS,
+  aiBackendUrl: AI_BACKEND_URL
+});
 
 if (!AI_BACKEND_URL) {
   logger.error('AI_BACKEND_URL not configured in environment variables', {

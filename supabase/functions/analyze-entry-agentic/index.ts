@@ -1,4 +1,96 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+import { createSupabaseClient } from "../_shared/supabaseClient.ts";
+import { JOURNAL_ENTRIES_TABLE_NAME } from "../_shared/constants.ts";
+import { z } from "https://deno.land/x/zod@v3.23.8/mod.ts";
+
+const RequestPayloadSchema = z.object({
+  journal_entry_id: z.string(),
+  transcript: z.string(),
+  user_id: z.string(),
+});
+
+// A simple router to decide which workers to run.
+// In the future, this will be a call to a router-agent.
+function route(transcript: string): string[] {
+  const workers = [
+    "emotion-worker",
+    "cbt-identifier-worker",
+    "cbt-reframer-worker",
+    "theme-worker",
+  ];
+  // Basic heuristic: if the transcript is very short, don't run all workers.
+  if (transcript.split(" ").length < 10) {
+    return ["emotion-worker"];
+  }
+  return workers;
+}
+
+async function invokeWorker(workerName: string, payload: object, supabase: any) {
+  const { data, error } = await supabase.functions.invoke(workerName, {
+    body: JSON.stringify(payload),
+  });
+
+  if (error) {
+    console.error(`Error invoking ${workerName}:`, error);
+    return { workerName, error: error.message };
+  }
+
+  return data;
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    const payload = await req.json();
+    const { journal_entry_id, transcript, user_id } = RequestPayloadSchema.parse(payload);
+
+    const supabase = createSupabaseClient(req);
+    const workersToRun = route(transcript);
+
+    const workerPayload = { transcript, user_id };
+
+    const workerPromises = workersToRun.map((workerName) =>
+      invokeWorker(workerName, workerPayload, supabase)
+    );
+
+    const results = await Promise.all(workerPromises);
+
+    // Merge results from all workers into a single analysis object
+    const analysis = results.reduce((acc, result) => {
+      if (result && !result.error && result.data) {
+        // Spread the data from each worker into the accumulator
+        Object.assign(acc, result.data);
+      }
+      return acc;
+    }, {});
+
+    // Persist the merged analysis to the database
+    const { error: updateError } = await supabase
+      .from(JOURNAL_ENTRIES_TABLE_NAME)
+      .update({ analysis: analysis as any })
+      .eq("id", journal_entry_id);
+
+    if (updateError) {
+      throw new Error(`Failed to save analysis: ${updateError.message}`);
+    }
+
+    return new Response(JSON.stringify({ analysis }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
+  } catch (error) {
+    console.error("Error in orchestrator:", error);
+    const errorMessage = error instanceof z.ZodError ? JSON.stringify(error.issues) : error.message;
+    return new Response(JSON.stringify({ error: "Failed to process request", details: errorMessage }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 /**
@@ -154,27 +246,32 @@ Deno.serve(async (req: Request) => {
       cbt_reframes: cbtReframerResp.reframes ?? [],
     } as const;
 
-    // async persist session + insights
-    supabase.from('journal_sessions').update({ ai_analysis: response }).eq('id', session.id);
+    // --- Centralized Persistence ------------------------------------------ //
 
-    // Persist themes to journal_themes (if new)
+    // 1. Persist full analysis to the journal_sessions table
+    supabase.from('journal_sessions').update({ 
+      ai_analysis: response,
+      user_id: session.user_id, // RLS check
+    }).eq('id', session.id).eq('user_id', session.user_id);
+
+    // 2. Persist themes to the dedicated journal_themes table
     if (response.themes.length) {
-      await Promise.all(response.themes.map(async (theme: string) => {
-        const { error } = await supabase.from('journal_themes').insert({
-          user_id: session.user_id,
-          entry_id: session.id,
-          theme,
-          embedding: '[]',
-        });
-        if (error && error.code !== '23505') { // ignore duplicates
-          log('error', 'theme_insert_failed', { theme, err: error.message });
-        }
+      const themeInserts = response.themes.map((theme: string) => ({
+        user_id: session.user_id, // RLS check
+        entry_id: session.id,
+        theme,
+        embedding: [], // No embedding generated at this stage
       }));
+      const { error } = await supabase.from('journal_themes').insert(themeInserts);
+      if (error && error.code !== '23505') { // Ignore duplicate errors
+        log('error', 'theme_insert_failed', { err: error.message });
+      }
     }
 
-    // upsert entry_insights row centrally
+    // 3. Upsert the structured insights into the entry_insights table
     const { error: insightsErr } = await supabase.from('entry_insights').upsert({
       entry_id: session.id,
+      user_id: session.user_id, // RLS FIX: Add user_id to satisfy policy
       emotions: mergedMoods,
       themes: response.identified_themes,
       cbt: {

@@ -1,4 +1,89 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+import { ThemeWorkerResponse } from "../_shared/types.ts";
+import { z } from "https://deno.land/x/zod@v3.23.8/mod.ts";
+import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.12.0";
+
+// Define the request payload schema
+const RequestPayloadSchema = z.object({
+  transcript: z.string(),
+});
+
+// Define the expected structure of the AI's JSON output
+const ThemeResponseSchema = z.object({
+  themes: z.array(
+    z.object({
+      theme: z.string(),
+      justification: z.string(),
+    })
+  ),
+});
+
+async function getThemePrompt(transcript: string): Promise<string> {
+  return `Analyze the following journal entry and identify the main themes or topics. For each theme, provide a brief justification based on the text. Your response must be a JSON object with a single key "themes", which is an array of objects. Each object in the array should have two keys: "theme" and "justification".
+
+Do not include any introductory text or pleasantries. Only return the JSON object.
+
+Journal Entry:
+"""
+${transcript}
+"""
+
+JSON Response:`;
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    const payload = await req.json();
+    const { transcript } = RequestPayloadSchema.parse(payload);
+
+    if (!transcript) {
+      return new Response(JSON.stringify({ error: "Missing transcript" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const genAI = new GoogleGenerativeAI(Deno.env.get("GEMINI_API_KEY")!);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const prompt = await getThemePrompt(transcript);
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text();
+
+    const cleanedJsonString = responseText.match(/\{.*\}/s)![0];
+    const aiResponse = JSON.parse(cleanedJsonString);
+
+    const validatedData = ThemeResponseSchema.parse(aiResponse);
+
+    const responsePayload: ThemeWorkerResponse = {
+      workerName: "theme",
+      data: { themes: validatedData.themes },
+    };
+
+    return new Response(JSON.stringify(responsePayload), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
+  } catch (error) {
+    console.error("Error processing request:", error);
+    let errorMessage = "An unexpected error occurred.";
+    if (error instanceof z.ZodError) {
+      errorMessage = JSON.stringify(error.issues);
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+
+    return new Response(JSON.stringify({ error: "Failed to process request", details: errorMessage }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
 
 /**
  * theme-worker
@@ -56,26 +141,38 @@ Deno.serve(async (req: Request) => {
 });
 
 async function extractThemes(text: string): Promise<string[]> {
-  const key = Deno.env.get("GEMINI_API_KEY");
-  if (!key) throw new Error("GEMINI_API_KEY missing");
-  const prompt =
+  const sysPrompt =
     `Identify 2-3 recurring life themes present in the following text.\n` +
     `Return a JSON array of short theme phrases.`;
-  const body = {
-    contents: [
-      { role: "system", parts: [{ text: prompt }] },
-      { role: "user", parts: [{ text }] },
-    ],
-  };
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+
+  const themes = await callLLM(sysPrompt, text);
+  return themes;
+}
+
+// Generic helper to call Gemini flash and parse JSON array
+async function callLLM(sysPrompt: string, userText: string): Promise<string[]> {
+  const key = Deno.env.get('GEMINI_API_KEY');
+  if (!key) throw new Error('GEMINI_API_KEY is not set');
+
+  const fullPrompt = `${sysPrompt}\n\nTEXT:\n${userText}`;
+
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${key}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+      generationConfig: { temperature: 0.4, maxOutputTokens: 256, response_mime_type: 'application/json' },
+    }),
   });
-  if (!res.ok) throw new Error(`Gemini error ${res.status}`);
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`Gemini API error ${res.status}: ${errorBody}`);
+  }
+
   const data = await res.json();
+  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "[]";
   try {
-    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "[]";
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed.map(String) : [];
   } catch {

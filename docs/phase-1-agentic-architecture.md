@@ -46,8 +46,8 @@ Traditional NLP pipelines apply the **same** fixed sequence of steps to every jo
 
 ## 4. Core Components
 
-### 4.1  Orchestrator (Edge Function `analyze-entry`)
-* **Location:** `supabase/functions/analyze-entry/index.ts`
+### 4.1  Orchestrator (Edge Function `analyze-entry-agentic`)
+* **Location:** `supabase/functions/analyze-entry-agentic/index.ts`
 * **Framework:** [LangGraph](https://github.com/langchain-ai/langgraph) style graph executed in a Supabase Edge Function.
 * **Responsibilities**  
   1. Validate JWT (`Security First`).  
@@ -134,7 +134,7 @@ create table if not exists public.entry_insights (
 
 ## 8. Performance & Cost Optimisations
 1. **Parallel Workers** – Promise.all.  
-2. **Model Tiering** – Haiku for classify/extract, Sonnet for generation.  
+2. **Model Tiering** – Gemini-1.5-flash for classify/extract, Gemini-2.0-flash for generation.  
 3. **Caching** – Redis edge cache for identical Emotion analyses (rare but cheap safeguard).
 
 ---
@@ -147,6 +147,6 @@ create table if not exists public.entry_insights (
 
 ## 10. Implementation Checklist 
 - [x] Edge Function **generate-summary** (existing) – *Refactor prompt to use buildGeminiPrompt()*
-- [x] Edge Function **analyze-entry** – *Created with Router-Worker orchestration*
-- [x] **aiApiClient** – Updated with `/api/analyze-entry` & strong typing
+- [x] Edge Function **analyze-entry-agentic** – *Created with Router-Worker orchestration*
+- [x] **aiApiClient** – Updated with `/api/analyze-entry-agentic` & strong typing
 - [ ] Dashboard UI – Display emotional & thematic trends (in progress)

@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { ThemeWorkerResponse } from "../_shared/types.ts";
 import { z } from "https://deno.land/x/zod@v3.23.8/mod.ts";
-import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.12.0";
+import { callGemini } from "../_shared/llm.ts";
 
 // Define the request payload schema
 const RequestPayloadSchema = z.object({
@@ -24,6 +24,71 @@ async function getThemePrompt(transcript: string): Promise<string> {
 
 Do not include any introductory text or pleasantries. Only return the JSON object.
 
+--- EXAMPLE 1 ---
+Journal Entry:
+"""
+I'm so stressed about the upcoming deadline at work. I've been pulling late nights, but I still feel like I'm behind. On top of that, I had a disagreement with my partner about our vacation plans. It just feels like everything is piling up at once.
+"""
+
+JSON Response:
+{
+  "themes": [
+    {
+      "theme": "Work-Life Balance",
+      "justification": "The user is struggling with a demanding work deadline and experiencing conflict in their personal life, indicating a challenge in balancing professional and personal responsibilities."
+    },
+    {
+      "theme": "Stress and Pressure",
+      "justification": "The user explicitly mentions feeling 'stressed' and 'behind' on a work project, highlighting feelings of pressure."
+    }
+  ]
+}
+
+--- EXAMPLE 2 ---
+Journal Entry:
+"""
+I've been thinking a lot about my career path lately. I'm not sure if this is what I want to be doing for the next 20 years. It pays the bills, but I don't feel fulfilled. I'm considering going back to school or starting my own thing.
+"""
+
+JSON Response:
+{
+  "themes": [
+    {
+      "theme": "Career Dissatisfaction",
+      "justification": "The user questions their current career path and expresses a lack of fulfillment, indicating dissatisfaction with their job."
+    },
+    {
+      "theme": "Future Planning",
+      "justification": "The user is contemplating major life changes like returning to school or entrepreneurship, showing a focus on long-term goals and personal growth."
+    }
+  ]
+}
+
+--- EXAMPLE 3 ---
+Journal Entry:
+"""
+My best friend and I had a huge fight. I said some things I regret, and now they're not talking to me. I feel awful and lonely. I miss them a lot.
+"""
+
+JSON Response:
+{
+  "themes": [
+    {
+      "theme": "Interpersonal Conflict",
+      "justification": "The user describes a 'huge fight' with their best friend, which is a clear example of conflict in a close relationship."
+    },
+    {
+      "theme": "Regret and Guilt",
+      "justification": "The user mentions saying 'things I regret' and feeling 'awful', pointing to feelings of guilt over their actions."
+    },
+    {
+      "theme": "Loneliness",
+      "justification": "The user explicitly states they feel 'lonely' and misses their friend, highlighting the emotional impact of the conflict."
+    }
+  ]
+}
+
+--- YOUR TASK ---
 Journal Entry:
 """
 ${transcript}
@@ -48,17 +113,8 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const genAI = new GoogleGenerativeAI(Deno.env.get("GEMINI_API_KEY")!);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
     const prompt = await getThemePrompt(transcript);
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
-
-    const cleanedJsonString = responseText.match(/\{.*\}/s)![0];
-    const aiResponse = JSON.parse(cleanedJsonString);
-
-    const validatedData = ThemeResponseSchema.parse(aiResponse);
+    const validatedData = await callGemini(prompt, ThemeResponseSchema);
 
     const responsePayload: ThemeWorkerResponse = {
       workerName: "theme",
@@ -85,97 +141,3 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-/**
- * theme-worker
- * ---------------------------------------------------------------------------
- * Identifies recurring life themes in a journal transcript. Returns a string[]
- * of themes. (No persistence – orchestrator is responsible.)
- * ---------------------------------------------------------------------------
- * Request  (JSON): { transcript: string, entry_id?: string, user_id?: string }
- * Response (JSON): { themes: string[] }
- */
-
-interface ThemeRequest { transcript?: string }
-interface ThemeResponse { themes: string[] }
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
-
-function log(level: "info" | "error", msg: string, meta: Record<string, unknown> = {}) {
-  console[level](`[theme-worker] ${msg}`, meta);
-}
-
-Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-
-  try {
-    const body = (await req.json()) as ThemeRequest;
-    if (!body?.transcript) {
-      return new Response(JSON.stringify({ error: "transcript is required" }), {
-        status: 400,
-        headers: corsHeaders,
-      });
-    }
-
-    const themes = await extractThemes(body.transcript);
-    const resp: ThemeResponse = { themes };
-    log("info", "themes_extracted", { count: themes.length });
-    return new Response(JSON.stringify(resp), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (err) {
-    log("error", "unexpected_error", {
-      err: err instanceof Error ? err.message : String(err),
-    });
-    return new Response(JSON.stringify({ error: "internal_error" }), {
-      status: 500,
-      headers: corsHeaders,
-    });
-  }
-});
-
-async function extractThemes(text: string): Promise<string[]> {
-  const sysPrompt =
-    `Identify 2-3 recurring life themes present in the following text.\n` +
-    `Return a JSON array of short theme phrases.`;
-
-  const themes = await callLLM(sysPrompt, text);
-  return themes;
-}
-
-// Generic helper to call Gemini flash and parse JSON array
-async function callLLM(sysPrompt: string, userText: string): Promise<string[]> {
-  const key = Deno.env.get('GEMINI_API_KEY');
-  if (!key) throw new Error('GEMINI_API_KEY is not set');
-
-  const fullPrompt = `${sysPrompt}\n\nTEXT:\n${userText}`;
-
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${key}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-      generationConfig: { temperature: 0.4, maxOutputTokens: 256, response_mime_type: 'application/json' },
-    }),
-  });
-
-  if (!res.ok) {
-    const errorBody = await res.text();
-    throw new Error(`Gemini API error ${res.status}: ${errorBody}`);
-  }
-
-  const data = await res.json();
-  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "[]";
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.map(String) : [];
-  } catch {
-    return [];
-  }
-}

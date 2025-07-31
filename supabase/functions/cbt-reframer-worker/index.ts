@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { CbtReframerWorkerResponse } from "../_shared/types.ts";
 import { z } from "https://deno.land/x/zod@v3.23.8/mod.ts";
-import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.12.0";
+import { callGemini } from "../_shared/llm.ts";
 
 // Define the request payload schema
 const RequestPayloadSchema = z.object({
@@ -25,6 +25,58 @@ async function getCbtReframePrompt(transcript: string): Promise<string> {
 
 Do not include any introductory text or pleasantries. Only return the JSON object.
 
+--- EXAMPLE 1 ---
+Journal Entry:
+"""
+I completely failed my presentation. I'm terrible at public speaking and should just avoid it completely.
+"""
+
+JSON Response:
+{
+  "reframes": [
+    {
+      "original_quote": "I completely failed my presentation. I'm terrible at public speaking and should just avoid it completely.",
+      "reframe": "My presentation didn't go as well as I hoped, but that doesn't define my abilities. Every great speaker has had challenging moments, and this is an opportunity for me to learn and improve.",
+      "justification": "This reframe avoids all-or-nothing thinking, acknowledges the difficulty without self-judgment, and turns it into a growth opportunity."
+    }
+  ]
+}
+
+--- EXAMPLE 2 ---
+Journal Entry:
+"""
+My partner is always upset with me. I can never do anything right in this relationship.
+"""
+
+JSON Response:
+{
+  "reframes": [
+    {
+      "original_quote": "My partner is always upset with me. I can never do anything right in this relationship.",
+      "reframe": "We've had some challenges in our relationship recently, but that doesn't mean everything is negative. We have many good moments too, and we can work through our issues together.",
+      "justification": "This reframe removes the absolutes ('always', 'never'), acknowledges the current difficulties while providing balance, and emphasizes the potential for positive change."
+    }
+  ]
+}
+
+--- EXAMPLE 3 ---
+Journal Entry:
+"""
+I made a mistake at work today. I'm going to get fired for sure. I'll never find another job with this economy.
+"""
+
+JSON Response:
+{
+  "reframes": [
+    {
+      "original_quote": "I made a mistake at work today. I'm going to get fired for sure. I'll never find another job with this economy.",
+      "reframe": "I made a mistake at work today, but everyone makes mistakes. I can learn from this experience and take steps to prevent it from happening again. Even if the worst happened, I have valuable skills that are in demand.",
+      "justification": "This reframe acknowledges the mistake without catastrophizing, focuses on learning and growth, and counters the fear of the future with a realistic assessment of the user's value."
+    }
+  ]
+}
+
+--- YOUR TASK ---
 Journal Entry:
 """
 ${transcript}
@@ -49,17 +101,8 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const genAI = new GoogleGenerativeAI(Deno.env.get("GEMINI_API_KEY")!);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
     const prompt = await getCbtReframePrompt(transcript);
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
-
-    const cleanedJsonString = responseText.match(/\{.*\}/s)![0];
-    const aiResponse = JSON.parse(cleanedJsonString);
-
-    const validatedData = CbtReframeResponseSchema.parse(aiResponse);
+    const validatedData = await callGemini(prompt, CbtReframeResponseSchema);
 
     const responsePayload: CbtReframerWorkerResponse = {
       workerName: "cbt_reframer",
@@ -86,87 +129,3 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-/**
- * cbt-reframer-worker
- * ---------------------------------------------------------------------------
- * Compares original and reframed journal text and returns structured info
- * about each reframing instance.
- *
- * Request  (JSON): { original: string, reframed: string }
- * Response (JSON): { reframes: Array<{ original_thought: string; reframed_thought: string; technique_used: string; benefit: string }> }
- */
-
-interface ReframerRequest { original?: string; reframed?: string }
-interface ReframeItem {
-  original_thought: string;
-  reframed_thought: string;
-  technique_used: string;
-  benefit: string;
-}
-interface ReframerResponse { reframes: ReframeItem[] }
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-function log(level: "info" | "error", msg: string, meta: Record<string, unknown> = {}) {
-  console[level](`[cbt-ref-worker] ${msg}`, meta);
-}
-
-Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-  try {
-    const body = (await req.json()) as ReframerRequest;
-    if (!body?.original || !body?.reframed) {
-      return new Response(JSON.stringify({ error: "original and reframed required" }), { status: 400, headers: corsHeaders });
-    }
-    const reframes = await analyseReframes(body.original, body.reframed);
-    const resp: ReframerResponse = { reframes };
-    log("info", "reframes_generated", { count: reframes.length });
-    return new Response(JSON.stringify(resp), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  } catch (err) {
-    log("error", "unhandled_exception", { err: err instanceof Error ? err.message : String(err) });
-    return new Response(JSON.stringify({ error: "internal_error" }), { status: 500, headers: corsHeaders });
-  }
-});
-
-async function analyseReframes(original: string, reframed: string): Promise<ReframeItem[]> {
-  const sysPrompt = `Compare the Original and Reframed text. For each significant reframing, return a valid JSON array of objects with these exact keys: "original_thought", "reframed_thought", "technique_used", "benefit".`;
-  const userText = `Original: ${original}\n\nReframed: ${reframed}`;
-  const reframes = await callLLM<ReframeItem>(sysPrompt, userText);
-  return reframes;
-}
-
-// Generic helper to call Gemini flash and parse JSON array
-async function callLLM<T>(sysPrompt: string, userText: string): Promise<T[]> {
-  const key = Deno.env.get('GEMINI_API_KEY');
-  if (!key) throw new Error('GEMINI_API_KEY is not set');
-
-  const fullPrompt = `${sysPrompt}\n\nTEXT:\n${userText}`;
-
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${key}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 1024, response_mime_type: 'application/json' },
-    }),
-  });
-
-  if (!res.ok) {
-    const errorBody = await res.text();
-    throw new Error(`Gemini API error ${res.status}: ${errorBody}`);
-  }
-
-  const data = await res.json();
-  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "[]";
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}

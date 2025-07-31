@@ -1,0 +1,8 @@
+{
+  "imports": {
+    "@google/generative-ai": "https://esm.sh/@google/generative-ai@0.12.0",
+    "zod": "https://deno.land/x/zod@v3.23.8/mod.ts",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.43.4",
+    "@supabase/functions-js": "jsr:@supabase/functions-js@2.0.2"
+  }
+}

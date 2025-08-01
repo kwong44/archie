@@ -46,7 +46,12 @@ export const PromptCard: React.FC<PromptCardProps> = ({
       [PromptCategory.DREAMS_ASPIRATIONS]: 'Dreams & Aspirations',
       [PromptCategory.PAST_EXPERIENCES]: 'Past Experiences',
       [PromptCategory.DAILY_MOMENTS]: 'Daily Moments',
-      [PromptCategory.DAILY_CHECKIN]: 'Daily Check-in'
+      [PromptCategory.DAILY_CHECKIN]: 'Daily Check-in',
+      [PromptCategory.GRATITUDE_PRACTICE]: 'Gratitude Practice',
+      [PromptCategory.NEGATIVE_PATTERN_AWARENESS]: 'Pattern Awareness',
+      [PromptCategory.SELF_DISCOVERY]: 'Self Discovery',
+      [PromptCategory.EMOTIONAL_INTELLIGENCE]: 'Emotional Intelligence',
+      [PromptCategory.MINDFULNESS_PRESENCE]: 'Mindfulness & Presence'
     };
     return categoryNames[category] || category;
   };
@@ -64,7 +69,12 @@ export const PromptCard: React.FC<PromptCardProps> = ({
       [PromptCategory.DREAMS_ASPIRATIONS]: '#F59E0B', // Amber
       [PromptCategory.PAST_EXPERIENCES]: '#EF4444', // Red
       [PromptCategory.DAILY_MOMENTS]: '#6B7280', // Gray
-      [PromptCategory.DAILY_CHECKIN]: '#FF8C00' // Orange
+      [PromptCategory.DAILY_CHECKIN]: '#FF8C00', // Orange
+      [PromptCategory.GRATITUDE_PRACTICE]: '#FF6B9D', // Pink - warm, appreciative
+      [PromptCategory.NEGATIVE_PATTERN_AWARENESS]: '#A855F7', // Deep purple - introspective
+      [PromptCategory.SELF_DISCOVERY]: '#F97316', // Orange - vibrant, exploratory
+      [PromptCategory.EMOTIONAL_INTELLIGENCE]: '#0EA5E9', // Sky blue - calm, intelligent
+      [PromptCategory.MINDFULNESS_PRESENCE]: '#059669' // Emerald green - peaceful, present
     };
     return categoryColors[category] || '#9CA3AF';
   };

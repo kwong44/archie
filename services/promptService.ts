@@ -14,7 +14,12 @@ export enum PromptCategory {
   DREAMS_ASPIRATIONS = 'dreams_aspirations',
   PAST_EXPERIENCES = 'past_experiences',
   DAILY_MOMENTS = 'daily_moments',
-  DAILY_CHECKIN = 'daily_checkin' // Fallback for when all topics are explored
+  DAILY_CHECKIN = 'daily_checkin', // Fallback for when all topics are explored
+  GRATITUDE_PRACTICE = 'gratitude_practice',
+  NEGATIVE_PATTERN_AWARENESS = 'negative_pattern_awareness',
+  SELF_DISCOVERY = 'self_discovery',
+  EMOTIONAL_INTELLIGENCE = 'emotional_intelligence',
+  MINDFULNESS_PRESENCE = 'mindfulness_presence'
 }
 
 /**
@@ -102,7 +107,12 @@ export class PromptService {
       [PromptCategory.PERSONAL_GROWTH]: ['growth', 'learn', 'improve', 'change', 'goal', 'habit'],
       [PromptCategory.DREAMS_ASPIRATIONS]: ['dream', 'hope', 'future', 'aspire', 'vision', 'imagine'],
       [PromptCategory.PAST_EXPERIENCES]: ['remember', 'past', 'childhood', 'memory', 'used to', 'before'],
-      [PromptCategory.DAILY_MOMENTS]: ['today', 'morning', 'evening', 'moment', 'right now', 'currently']
+      [PromptCategory.DAILY_MOMENTS]: ['today', 'morning', 'evening', 'moment', 'right now', 'currently'],
+      [PromptCategory.GRATITUDE_PRACTICE]: ['grateful', 'thankful', 'appreciate', 'blessed', 'fortunate', 'gratitude'],
+      [PromptCategory.NEGATIVE_PATTERN_AWARENESS]: ['negative', 'pattern', 'thought', 'thinking', 'mindset', 'belief'],
+      [PromptCategory.SELF_DISCOVERY]: ['discover', 'explore', 'understand', 'know myself', 'identity', 'who i am'],
+      [PromptCategory.EMOTIONAL_INTELLIGENCE]: ['emotion', 'feeling', 'empathy', 'emotional', 'intelligence', 'awareness'],
+      [PromptCategory.MINDFULNESS_PRESENCE]: ['mindful', 'present', 'awareness', 'breath', 'meditation', 'conscious']
     };
 
     const exploredCategories: PromptCategory[] = [];
@@ -293,6 +303,251 @@ export class PromptService {
           title: "A Single Word",
           prompt: "If you had to describe your day so far in a single word, what would it be? Let's start there.",
           level: 'surface'
+        },
+        {
+          title: "Gratitude Moment",
+          prompt: "What's one small thing that went well today that you might have overlooked? How did it make you feel?",
+          level: 'surface'
+        },
+        {
+          title: "Challenge Reframe",
+          prompt: "What was the most challenging moment today? How might you reframe it as an opportunity for growth?",
+          level: 'medium'
+        },
+        {
+          title: "Self-Compassion Check",
+          prompt: "How did you treat yourself today? What would it look like to be as kind to yourself as you are to others?",
+          level: 'deep'
+        },
+        {
+          title: "Connection Reflection",
+          prompt: "Who did you connect with today? How did those interactions leave you feeling?",
+          level: 'surface'
+        },
+        {
+          title: "Learning Moment",
+          prompt: "What did you learn about yourself today, even if it was something small?",
+          level: 'medium'
+        },
+        {
+          title: "Tomorrow's Intention",
+          prompt: "What's one thing you'd like to approach differently tomorrow? How could you reframe any resistance?",
+          level: 'deep'
+        },
+        {
+          title: "Body Wisdom",
+          prompt: "What is your body asking for right now? How can you honor that need?",
+          level: 'surface'
+        }
+      ],
+      [PromptCategory.GRATITUDE_PRACTICE]: [
+        {
+          title: "Hidden Blessings",
+          prompt: "What's something that initially seemed negative but actually led to something positive?",
+          level: 'medium'
+        },
+        {
+          title: "People Appreciation",
+          prompt: "Who has made a positive impact on your life recently? How did they show up for you?",
+          level: 'surface'
+        },
+        {
+          title: "Skill Gratitude",
+          prompt: "What's one skill or ability you have that you often take for granted? How does it serve you?",
+          level: 'medium'
+        },
+        {
+          title: "Comfort Gratitude",
+          prompt: "What's one thing that brings you comfort that you're grateful for today?",
+          level: 'surface'
+        },
+        {
+          title: "Challenge Gratitude",
+          prompt: "What's a difficult situation you're grateful for because it made you stronger?",
+          level: 'deep'
+        },
+        {
+          title: "Nature's Gifts",
+          prompt: "What's one thing in nature you're grateful for today? How does it connect you to something larger?",
+          level: 'surface'
+        },
+        {
+          title: "Past Self Gratitude",
+          prompt: "What's something your past self did that you're grateful for today?",
+          level: 'medium'
+        },
+        {
+          title: "Abundance Recognition",
+          prompt: "What's one thing you have in abundance that others might not? How does this shape your perspective?",
+          level: 'deep'
+        }
+      ],
+      [PromptCategory.NEGATIVE_PATTERN_AWARENESS]: [
+        {
+          title: "Thought Pattern Detective",
+          prompt: "What's a recurring negative thought you've noticed? What triggers it?",
+          level: 'surface'
+        },
+        {
+          title: "Self-Criticism Awareness",
+          prompt: "What's something you often criticize yourself for? How would you talk to a friend about the same thing?",
+          level: 'medium'
+        },
+        {
+          title: "Comparison Trap",
+          prompt: "When do you find yourself comparing yourself to others? What's really driving that comparison?",
+          level: 'medium'
+        },
+        {
+          title: "Perfectionism Reflection",
+          prompt: "Where does perfectionism show up in your life? What would 'good enough' look like instead?",
+          level: 'deep'
+        },
+        {
+          title: "Catastrophizing Check",
+          prompt: "What's a situation where you're imagining the worst-case scenario? What's a more balanced perspective?",
+          level: 'medium'
+        },
+        {
+          title: "All-or-Nothing Thinking",
+          prompt: "Where do you see black-and-white thinking in your life? What shades of gray exist?",
+          level: 'deep'
+        },
+        {
+          title: "Should Statements",
+          prompt: "What 'should' statements do you tell yourself? How could you reframe them with more compassion?",
+          level: 'medium'
+        },
+        {
+          title: "Emotional Reasoning",
+          prompt: "When do you let your feelings determine what you believe to be true? What's the difference?",
+          level: 'deep'
+        }
+      ],
+      [PromptCategory.SELF_DISCOVERY]: [
+        {
+          title: "Core Values Check",
+          prompt: "What's one of your core values? How did you live it out today?",
+          level: 'surface'
+        },
+        {
+          title: "Strengths Recognition",
+          prompt: "What's a strength you have that you don't often acknowledge? How does it show up in your life?",
+          level: 'medium'
+        },
+        {
+          title: "Boundary Reflection",
+          prompt: "Where do you need to set or strengthen boundaries? What would that look like?",
+          level: 'deep'
+        },
+        {
+          title: "Authenticity Moment",
+          prompt: "When did you feel most like yourself today? What made that moment special?",
+          level: 'surface'
+        },
+        {
+          title: "Growth Edge",
+          prompt: "What's one area where you're stretching beyond your comfort zone? How does that feel?",
+          level: 'medium'
+        },
+        {
+          title: "Inner Wisdom",
+          prompt: "What's something your intuition has been trying to tell you? How can you listen more closely?",
+          level: 'deep'
+        },
+        {
+          title: "Passion Exploration",
+          prompt: "What activities make you lose track of time? What does that tell you about what you love?",
+          level: 'medium'
+        },
+        {
+          title: "Identity Evolution",
+          prompt: "How have you changed in the past year? What parts of yourself are you discovering?",
+          level: 'deep'
+        }
+      ],
+      [PromptCategory.EMOTIONAL_INTELLIGENCE]: [
+        {
+          title: "Emotion Naming",
+          prompt: "What emotions are you feeling right now? Can you name them specifically?",
+          level: 'surface'
+        },
+        {
+          title: "Emotion Origins",
+          prompt: "What triggered a strong emotion today? What was really behind that feeling?",
+          level: 'medium'
+        },
+        {
+          title: "Emotional Patterns",
+          prompt: "What emotions do you tend to avoid? What happens when you allow yourself to feel them?",
+          level: 'deep'
+        },
+        {
+          title: "Empathy Practice",
+          prompt: "How did you show empathy to someone today? How did it feel to connect with their experience?",
+          level: 'medium'
+        },
+        {
+          title: "Emotional Regulation",
+          prompt: "What helps you calm down when you're overwhelmed? How can you make that more accessible?",
+          level: 'surface'
+        },
+        {
+          title: "Emotional Boundaries",
+          prompt: "How do you handle other people's emotions? Where do you need to set boundaries?",
+          level: 'deep'
+        },
+        {
+          title: "Joy Cultivation",
+          prompt: "What brings you genuine joy? How can you create more space for that in your life?",
+          level: 'medium'
+        },
+        {
+          title: "Emotional Courage",
+          prompt: "What emotion are you afraid to feel? What would it be like to welcome it with curiosity?",
+          level: 'deep'
+        }
+      ],
+      [PromptCategory.MINDFULNESS_PRESENCE]: [
+        {
+          title: "Present Moment",
+          prompt: "What do you notice about your surroundings right now? What details are you usually too busy to see?",
+          level: 'surface'
+        },
+        {
+          title: "Breath Awareness",
+          prompt: "Take three deep breaths. What do you notice about your breathing? How does it change your state?",
+          level: 'surface'
+        },
+        {
+          title: "Sensory Experience",
+          prompt: "What do you hear, see, smell, taste, and feel right now? How does paying attention change the experience?",
+          level: 'medium'
+        },
+        {
+          title: "Thought Observation",
+          prompt: "What thoughts are passing through your mind? Can you observe them without getting caught up in them?",
+          level: 'deep'
+        },
+        {
+          title: "Body Scan",
+          prompt: "Starting from your toes, scan your body. What sensations do you notice? What are they telling you?",
+          level: 'medium'
+        },
+        {
+          title: "Mindful Eating",
+          prompt: "Think about your last meal. What would it be like to eat with full attention to taste, texture, and gratitude?",
+          level: 'surface'
+        },
+        {
+          title: "Walking Meditation",
+          prompt: "What do you notice when you walk mindfully? How does slowing down change your experience?",
+          level: 'medium'
+        },
+        {
+          title: "Digital Mindfulness",
+          prompt: "How do you feel when you're on your phone? What would it be like to use technology more mindfully?",
+          level: 'deep'
         }
       ]
     };

@@ -16,7 +16,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  */
 
 // Google Gemini API configuration
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1alpha/models/gemini-2.0-flash:generateContent';
 const MAX_TEXT_LENGTH = 10000; // Reasonable limit for journal entries
 const MAX_PRINCIPLES = 10; // Limit on user principles
 
@@ -194,7 +194,7 @@ Reply ONLY with valid JSON in this exact shape:
 
 /**
  * Calls Google Gemini API for AI summary and description generation
- * Uses the gemini-1.5-flash model for fast, high-quality responses
+ * Uses the gemini-2.0-flash model for fast, high-quality responses
  */
 async function generateWithGemini(request: SummaryRequest): Promise<{ summary: string; description: string }> {
   const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
@@ -207,7 +207,7 @@ async function generateWithGemini(request: SummaryRequest): Promise<{ summary: s
   const prompt = buildGeminiPrompt(request);
   
   console.log('🤖 Starting Gemini AI generation for summary and description', {
-    model: 'gemini-1.5-flash',
+    model: 'gemini-2.0-flash',
     promptLength: prompt.length
   });
   
@@ -232,7 +232,7 @@ async function generateWithGemini(request: SummaryRequest): Promise<{ summary: s
     };
     
     // Make API request to Gemini
-    const response = await fetch(`${GEMINI_API_URL}?key=${geminiApiKey}`, {
+    const response = await fetch(`${GEMINI_API_BASE_URL}?key=${geminiApiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

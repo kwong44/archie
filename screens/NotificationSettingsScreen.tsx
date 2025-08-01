@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Switch, Activit
 import { useRouter } from 'expo-router';
 import { NotificationService } from '@/services/notificationService';
 import { createContextLogger } from '@/lib/logger';
-import { Sun, Cloud, Moon, X as XIcon } from 'lucide-react-native';
+import { Sun, Cloud, Moon, X as XIcon, Clock } from 'lucide-react-native';
 import { useAuth } from '@/context/AuthContext';
 import { TimePickerModal } from '@/components/TimePickerModal';
 
@@ -203,8 +203,15 @@ export default function NotificationSettingsScreen() {
           <Text style={styles.cardLabel}>{option.label}</Text>
         </View>
         <View style={styles.cardRight}>
-          <TouchableOpacity onPress={() => openTimePicker(option.slot)}>
-            <Text style={styles.timeText}>{displayTime}</Text>
+          <TouchableOpacity 
+            style={styles.timeContainer}
+            onPress={() => openTimePicker(option.slot)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.timeContent}>
+              <Clock color={ACCENT_PRIMARY} size={16} />
+              <Text style={styles.timeText}>{displayTime}</Text>
+            </View>
           </TouchableOpacity>
           <Switch
             trackColor={{ false: BORDER_COLOR, true: ACCENT_PRIMARY }}
@@ -355,5 +362,25 @@ const styles = StyleSheet.create({
   buttonContainer: {
     marginTop: 'auto',
     marginBottom: 40,
+  },
+  timeContainer: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: BORDER_COLOR,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: TEXT_TERTIARY,
+    minWidth: 90,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  timeContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
 }); 

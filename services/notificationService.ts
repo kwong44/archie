@@ -60,13 +60,15 @@ export class NotificationService {
     // Cancel an existing reminder for this specific slot
     await this.cancelReminderForSlot(slot);
 
-    // Schedule the local notification to repeat daily at the desired time
+    // Schedule the daily notification using the DAILY trigger type
+    // This is the correct way according to Expo documentation
     const identifier = await Notifications.scheduleNotificationAsync({
       content: {
         title: 'Time for your me-time',
         body: 'Open Archie and take a moment for yourself.',
       },
       trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
         hour,
         minute,
         repeats: true,
@@ -76,7 +78,13 @@ export class NotificationService {
     // Persist locally for cancellation
     await AsyncStorage.setItem(
       storageKey,
-      JSON.stringify({ identifier, hour, minute, slot })
+      JSON.stringify({ 
+        identifier,
+        hour, 
+        minute, 
+        slot,
+        scheduledAt: new Date().toISOString()
+      })
     );
 
     // Persist to Supabase for cross-device sync
@@ -144,7 +152,13 @@ export class NotificationService {
       });
     }
 
-    notificationLogger.info('Daily reminder scheduled', { identifier, hour, minute, slot });
+    notificationLogger.info('Daily reminder scheduled', { 
+      identifier,
+      hour, 
+      minute, 
+      slot,
+      triggerType: 'DAILY'
+    });
   }
 
   /**
@@ -161,6 +175,7 @@ export class NotificationService {
 
         try {
           const { identifier } = JSON.parse(stored);
+          
           if (identifier) {
             await Notifications.cancelScheduledNotificationAsync(identifier);
             notificationLogger.debug('Cancelled existing scheduled reminder', { identifier });
@@ -182,6 +197,7 @@ export class NotificationService {
 
     try {
       const { identifier } = JSON.parse(stored);
+      
       if (identifier) {
         await Notifications.cancelScheduledNotificationAsync(identifier);
         notificationLogger.debug(`Cancelled reminder for slot: ${slot}`, { identifier });
@@ -217,6 +233,126 @@ export class NotificationService {
       return null;
     }
 
+    // Return the actual stored hour and minute values
     return { hour: data.hour, minute: data.minute };
+  }
+
+  /**
+   * Gets all currently scheduled notifications for debugging purposes.
+   * This is useful for verifying that notifications are scheduled correctly.
+   */
+  static async getScheduledNotifications(): Promise<any[]> {
+    try {
+      const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
+      notificationLogger.debug('Retrieved scheduled notifications', { 
+        count: scheduledNotifications.length 
+      });
+      return scheduledNotifications;
+    } catch (error) {
+      notificationLogger.error('Failed to get scheduled notifications', { error });
+      return [];
+    }
+  }
+
+  /**
+   * Schedules a test notification for debugging purposes.
+   * This will fire in 5 seconds to verify notification functionality.
+   */
+  static async scheduleTestNotification(): Promise<string> {
+    const hasPermission = await this.requestPermission();
+    if (!hasPermission) {
+      throw new Error('Notifications permission not granted');
+    }
+
+    const testTime = new Date(Date.now() + 5000); // 5 seconds from now
+    
+    const identifier = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Test Notification',
+        body: 'This is a test notification from Archie',
+      },
+      trigger: {
+        date: testTime,
+        repeats: false,
+      },
+    });
+
+    notificationLogger.info('Test notification scheduled', { 
+      identifier, 
+      scheduledFor: testTime.toISOString() 
+    });
+    
+    return identifier;
+  }
+
+  /**
+   * Debug method to check the current state of notification preferences in the database.
+   * This helps troubleshoot issues with preference fetching.
+   */
+  static async debugUserPreferences(): Promise<void> {
+    try {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError || !session?.user) {
+        notificationLogger.warn('No active session for debug', { sessionError });
+        return;
+      }
+
+      const userId = session.user.id;
+      notificationLogger.info('Debugging user preferences', { userId });
+
+      const { data, error } = await supabase
+        .from('user_notification_preferences')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (error) {
+        notificationLogger.error('Failed to fetch user preferences for debug', { 
+          userId, 
+          error: error.message 
+        });
+        return;
+      }
+
+      notificationLogger.info('User notification preferences found', {
+        userId,
+        preferences: data,
+        count: data.length
+      });
+
+      // Also check what's currently scheduled
+      const scheduledNotifications = await this.getScheduledNotifications();
+      notificationLogger.info('Currently scheduled notifications', {
+        userId,
+        scheduledCount: scheduledNotifications.length,
+        scheduledNotifications: scheduledNotifications.map(n => ({
+          identifier: n.identifier,
+          trigger: n.trigger,
+          content: n.content
+        }))
+      });
+
+      // Get next trigger dates for all scheduled notifications
+      for (const notification of scheduledNotifications) {
+        try {
+          const nextTriggerDate = await Notifications.getNextTriggerDateAsync(notification.identifier);
+          notificationLogger.info('Next trigger date for notification', {
+            identifier: notification.identifier,
+            nextTriggerDate: nextTriggerDate?.toISOString()
+          });
+        } catch (error) {
+          notificationLogger.warn('Failed to get next trigger date', {
+            identifier: notification.identifier,
+            error: (error as Error).message
+          });
+        }
+      }
+
+    } catch (error) {
+      notificationLogger.error('Error in debugUserPreferences', { error: (error as Error).message });
+    }
   }
 } 

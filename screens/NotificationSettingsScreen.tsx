@@ -51,13 +51,38 @@ export default function NotificationSettingsScreen() {
 
   useEffect(() => {
     const loadPref = async () => {
-      const pref = await NotificationService.getUserPreference();
-      if (pref) {
-        // Try to match stored hour/minute to one of our predefined slots
-        const match = OPTIONS.find(o => o.hour === pref.hour && o.minute === pref.minute);
-        if (match) setSelected(match.slot);
+      try {
+        console.log('Loading notification preferences...');
+        const pref = await NotificationService.getUserPreference();
+        console.log('Retrieved preference:', pref);
+        
+        if (pref) {
+          // Update the reminders state with the actual stored values
+          setReminders(prev => ({
+            ...prev,
+            morning: { hour: pref.hour, minute: pref.minute },
+            day: { hour: pref.hour, minute: pref.minute },
+            night: { hour: pref.hour, minute: pref.minute },
+          }));
+          
+          // Try to match stored hour/minute to one of our predefined slots
+          const match = OPTIONS.find(o => o.hour === pref.hour && o.minute === pref.minute);
+          console.log('Found match:', match);
+          
+          if (match) {
+            setSelected(match.slot);
+          } else {
+            // If no exact match, default to morning but keep the stored time
+            setSelected('morning');
+          }
+        } else {
+          console.log('No preference found, using defaults');
+        }
+      } catch (error) {
+        console.error('Error loading preferences:', error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     loadPref();
   }, []);

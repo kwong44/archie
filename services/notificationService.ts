@@ -105,17 +105,9 @@ export class NotificationService {
       const userId = session.user.id;
 
       /**
-       * The database table `user_notification_preferences` has a *unique* constraint on
-       * `user_id` **only** (see schema comment in PRD). In addition, the column
-       * `reminder_slot` is validated by a CHECK-constraint that accepts
-       * `"morning" | "day" | "evening"` but *not* `"night"`.
-       *
-       * 1. We therefore map the UI value `night` → `evening` before we persist.
-       * 2. We must use **onConflict: 'user_id'** so the UPSERT aligns with the
-       *    existing unique index; otherwise PostgreSQL throws an error because
-       *    there is no composite unique index on `user_id, reminder_slot`.
+       * Map the UI slot to database slot format
+       * The database accepts "morning", "day", "evening" but UI uses "night"
        */
-
       const dbSlot = slot === 'night' ? 'evening' : slot;
       notificationLogger.debug('Persisting notification preference', {
         userId,
@@ -125,6 +117,7 @@ export class NotificationService {
         minute,
       });
 
+      // Upsert the notification preference for this specific slot
       const { error } = await supabase
         .from('user_notification_preferences')
         .upsert(
@@ -135,7 +128,7 @@ export class NotificationService {
             minute,
             updated_at: new Date().toISOString(),
           },
-          { onConflict: 'user_id' }
+          { onConflict: 'user_id,reminder_slot' } // Use composite key if available, otherwise will create new row
         );
 
       if (error) {
@@ -144,7 +137,7 @@ export class NotificationService {
           error: error.message,
         });
       } else {
-        notificationLogger.info('Notification preference saved to Supabase', { userId });
+        notificationLogger.info('Notification preference saved to Supabase', { userId, slot: dbSlot });
       }
     } catch (err) {
       notificationLogger.warn('Error persisting preference to Supabase', {
@@ -212,29 +205,45 @@ export class NotificationService {
   }
 
   /**
-   * Retrieves the user\'s stored preference from Supabase (if any).
+   * Retrieves all of the user's stored notification preferences from Supabase.
    */
-  static async getUserPreference(): Promise<{ hour: number; minute: number } | null> {
+  static async getUserPreferences(): Promise<Array<{ slot: string; hour: number; minute: number }>> {
     const {
       data: { session },
       error: sessionError,
     } = await supabase.auth.getSession();
 
-    if (sessionError || !session?.user) return null;
+    if (sessionError || !session?.user) return [];
 
     const { data, error } = await supabase
       .from('user_notification_preferences')
       .select('*')
-      .eq('user_id', session.user.id)
-      .single();
+      .eq('user_id', session.user.id);
 
     if (error) {
-      notificationLogger.warn('Failed to fetch user notification preference', { error: error.message });
-      return null;
+      notificationLogger.warn('Failed to fetch user notification preferences', { error: error.message });
+      return [];
     }
 
-    // Return the actual stored hour and minute values
-    return { hour: data.hour, minute: data.minute };
+    // Map database slots back to UI slots and return all preferences
+    return data.map(pref => ({
+      slot: pref.reminder_slot === 'evening' ? 'night' : pref.reminder_slot,
+      hour: pref.hour,
+      minute: pref.minute,
+    }));
+  }
+
+  /**
+   * Retrieves the user's stored preference from Supabase (if any).
+   * @deprecated Use getUserPreferences() instead for multiple slot support
+   */
+  static async getUserPreference(): Promise<{ hour: number; minute: number } | null> {
+    const preferences = await this.getUserPreferences();
+    if (preferences.length === 0) return null;
+    
+    // Return the first preference for backward compatibility
+    const firstPref = preferences[0];
+    return { hour: firstPref.hour, minute: firstPref.minute };
   }
 
   /**
@@ -286,6 +295,56 @@ export class NotificationService {
   }
 
   /**
+   * Removes a specific notification preference for a slot.
+   * This cancels the notification and removes it from the database.
+   */
+  static async removeNotificationPreference(slot: string): Promise<void> {
+    const storageKey = `${REMINDER_STORAGE_KEY_PREFIX}${slot}`;
+
+    // Cancel the local notification for this slot
+    await this.cancelReminderForSlot(slot);
+
+    // Remove from Supabase
+    try {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError || !session?.user) {
+        notificationLogger.warn('No active session for removing preference');
+        return;
+      }
+
+      const userId = session.user.id;
+      const dbSlot = slot === 'night' ? 'evening' : slot;
+
+      const { error } = await supabase
+        .from('user_notification_preferences')
+        .delete()
+        .eq('user_id', userId)
+        .eq('reminder_slot', dbSlot);
+
+      if (error) {
+        notificationLogger.warn('Failed to remove notification preference from Supabase', {
+          userId,
+          slot: dbSlot,
+          error: error.message,
+        });
+      } else {
+        notificationLogger.info('Notification preference removed from Supabase', { 
+          userId, 
+          slot: dbSlot 
+        });
+      }
+    } catch (err) {
+      notificationLogger.warn('Error removing preference from Supabase', {
+        error: (err as Error).message,
+      });
+    }
+  }
+
+  /**
    * Debug method to check the current state of notification preferences in the database.
    * This helps troubleshoot issues with preference fetching.
    */
@@ -304,23 +363,12 @@ export class NotificationService {
       const userId = session.user.id;
       notificationLogger.info('Debugging user preferences', { userId });
 
-      const { data, error } = await supabase
-        .from('user_notification_preferences')
-        .select('*')
-        .eq('user_id', userId);
-
-      if (error) {
-        notificationLogger.error('Failed to fetch user preferences for debug', { 
-          userId, 
-          error: error.message 
-        });
-        return;
-      }
-
+      // Get all preferences using the new method
+      const preferences = await this.getUserPreferences();
       notificationLogger.info('User notification preferences found', {
         userId,
-        preferences: data,
-        count: data.length
+        preferences,
+        count: preferences.length
       });
 
       // Also check what's currently scheduled

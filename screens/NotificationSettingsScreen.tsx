@@ -37,7 +37,7 @@ const OPTIONS: TimeOptionDef[] = [
 export default function NotificationSettingsScreen() {
   const router = useRouter();
   const { session } = useAuth();
-  const [selected, setSelected] = useState<ReminderSlot | null>(null);
+  const [selectedSlots, setSelectedSlots] = useState<Set<ReminderSlot>>(new Set());
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -53,30 +53,28 @@ export default function NotificationSettingsScreen() {
     const loadPref = async () => {
       try {
         console.log('Loading notification preferences...');
-        const pref = await NotificationService.getUserPreference();
-        console.log('Retrieved preference:', pref);
+        const preferences = await NotificationService.getUserPreferences();
+        console.log('Retrieved preferences:', preferences);
         
-        if (pref) {
-          // Update the reminders state with the actual stored values
-          setReminders(prev => ({
-            ...prev,
-            morning: { hour: pref.hour, minute: pref.minute },
-            day: { hour: pref.hour, minute: pref.minute },
-            night: { hour: pref.hour, minute: pref.minute },
-          }));
+        if (preferences.length > 0) {
+          // Create a set of selected slots from the preferences
+          const selectedSlotSet = new Set<ReminderSlot>();
           
-          // Try to match stored hour/minute to one of our predefined slots
-          const match = OPTIONS.find(o => o.hour === pref.hour && o.minute === pref.minute);
-          console.log('Found match:', match);
-          
-          if (match) {
-            setSelected(match.slot);
-          } else {
-            // If no exact match, default to morning but keep the stored time
-            setSelected('morning');
+          // Update reminders and selected slots based on stored preferences
+          for (const pref of preferences) {
+            selectedSlotSet.add(pref.slot as ReminderSlot);
+            
+            // Update the reminders state with the stored values
+            setReminders(prev => ({
+              ...prev,
+              [pref.slot]: { hour: pref.hour, minute: pref.minute },
+            }));
           }
+          
+          setSelectedSlots(selectedSlotSet);
+          console.log('Set selected slots:', Array.from(selectedSlotSet));
         } else {
-          console.log('No preference found, using defaults');
+          console.log('No preferences found, using defaults');
         }
       } catch (error) {
         console.error('Error loading preferences:', error);
@@ -95,13 +93,27 @@ export default function NotificationSettingsScreen() {
   };
 
   const handleSave = async () => {
-    if (!selected) return;
+    if (selectedSlots.size === 0) return;
     setProcessing(true);
     try {
-      const timeToSave = reminders[selected];
-      if (!timeToSave) throw new Error('Invalid selection');
-      await NotificationService.scheduleDailyReminder(timeToSave.hour, timeToSave.minute, selected);
-      Alert.alert('Updated', 'Reminder time saved.');
+      // Get current preferences to see which slots need to be scheduled
+      const currentPreferences = await NotificationService.getUserPreferences();
+      const existingSlots = new Set(currentPreferences.map(p => p.slot));
+      
+      // Only schedule notifications for slots that don't already have preferences
+      const slotsToSchedule = Array.from(selectedSlots).filter(slot => !existingSlots.has(slot));
+      
+      for (const slot of slotsToSchedule) {
+        const timeToSave = reminders[slot];
+        if (!timeToSave) throw new Error(`Invalid selection for slot: ${slot}`);
+        await NotificationService.scheduleDailyReminder(timeToSave.hour, timeToSave.minute, slot);
+      }
+      
+      if (slotsToSchedule.length > 0) {
+        Alert.alert('Updated', 'Reminder times saved.');
+      } else {
+        Alert.alert('No Changes', 'All selected reminders are already configured.');
+      }
       router.back();
     } catch (e) {
       Alert.alert('Error', (e as Error).message);
@@ -115,7 +127,7 @@ export default function NotificationSettingsScreen() {
     try {
       await NotificationService.cancelExistingReminder();
       Alert.alert('Disabled', 'Reminders disabled.');
-      setSelected(null);
+      setSelectedSlots(new Set());
       // remove pref in supabase handled in cancel func? Not yet, but ok.
     } catch (e) {
       Alert.alert('Error', (e as Error).message);
@@ -124,7 +136,28 @@ export default function NotificationSettingsScreen() {
     }
   };
 
-  const toggle = (slot: ReminderSlot) => setSelected(slot);
+  const toggleSlot = async (slot: ReminderSlot) => {
+    const newSelectedSlots = new Set(selectedSlots);
+    const wasSelected = newSelectedSlots.has(slot);
+    
+    if (wasSelected) {
+      // Slot is being deselected - remove the notification preference
+      newSelectedSlots.delete(slot);
+      try {
+        await NotificationService.removeNotificationPreference(slot);
+        console.log(`Removed notification preference for slot: ${slot}`);
+      } catch (error) {
+        console.error(`Error removing notification preference for slot ${slot}:`, error);
+        // Don't update the UI if the removal failed
+        return;
+      }
+    } else {
+      // Slot is being selected - just add to the set
+      newSelectedSlots.add(slot);
+    }
+    
+    setSelectedSlots(newSelectedSlots);
+  };
 
   const openTimePicker = (slot: ReminderSlot) => {
     setActiveSlot(slot);
@@ -137,7 +170,8 @@ export default function NotificationSettingsScreen() {
         ...prev,
         [activeSlot]: time,
       }));
-      setSelected(activeSlot);
+      // Ensure the slot is selected when time is changed
+      setSelectedSlots(prev => new Set([...prev, activeSlot]));
       setModalVisible(false);
     }
   };
@@ -159,7 +193,7 @@ export default function NotificationSettingsScreen() {
 
   const renderCard = (option: TimeOptionDef) => {
     const Icon = option.icon;
-    const active = selected === option.slot;
+    const isActive = selectedSlots.has(option.slot);
     const displayTime = formatTime(reminders[option.slot].hour, reminders[option.slot].minute);
 
     return (
@@ -174,9 +208,9 @@ export default function NotificationSettingsScreen() {
           </TouchableOpacity>
           <Switch
             trackColor={{ false: BORDER_COLOR, true: ACCENT_PRIMARY }}
-            thumbColor={active ? PRIMARY_BACKGROUND : TEXT_SECONDARY}
-            onValueChange={() => toggle(option.slot)}
-            value={active}
+            thumbColor={isActive ? PRIMARY_BACKGROUND : TEXT_SECONDARY}
+            onValueChange={() => toggleSlot(option.slot)}
+            value={isActive}
           />
         </View>
       </View>
@@ -205,7 +239,7 @@ export default function NotificationSettingsScreen() {
         </View>
 
         <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={processing || !selected}>
+          <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={processing || selectedSlots.size === 0}>
             {processing ? <ActivityIndicator color={PRIMARY_BACKGROUND} /> : <Text style={styles.saveTxt}>Save</Text>}
           </TouchableOpacity>
           <TouchableOpacity style={styles.disableBtn} onPress={handleDisable} disabled={processing}>
